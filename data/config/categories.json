@@ -1,0 +1,139 @@
+{
+  "_meta": {
+    "domain": "placesinrishikesh.com",
+    "brand": "Bucketlistt",
+    "purpose": "Maps article categories to Bucketlistt service pages for CTA injection",
+    "last_updated": "2026-05-03"
+  },
+
+  "product_categories": [
+    "Bungee Jumping in Rishikesh",
+    "River Rafting in Rishikesh",
+    "Giant Swing & Tower Swing Rishikesh",
+    "Flying Fox & Zipline Rishikesh",
+    "Paragliding in Rishikesh",
+    "Hot Air Balloon Rishikesh",
+    "Adventure Camping Rishikesh",
+    "Bike & Scooty Rental Rishikesh",
+    "Trek & Temple Tours Rishikesh",
+    "Multi-Activity Adventure Combos Rishikesh",
+    "SCAD Jump Rishikesh",
+    "Skywalk & Cliff Jumping Rishikesh"
+  ],
+
+  "industry_categories": [
+    "Things To Do in Rishikesh",
+    "Rishikesh Adventure Sports Guide",
+    "Rishikesh Travel Tips & Planning",
+    "Spiritual & Cultural Rishikesh",
+    "Best Time to Visit Rishikesh",
+    "Rishikesh Camping & Stays",
+    "Rishikesh Food & Local Culture",
+    "Rishikesh Transport & Getting Around",
+    "Rishikesh Safety & Travel Advice",
+    "Rishikesh Itineraries & Trip Plans",
+    "Adventure Sports Comparisons",
+    "Solo Travel Rishikesh",
+    "Couple Trips Rishikesh",
+    "Family Adventures Rishikesh",
+    "Group & Corporate Adventures Rishikesh",
+    "Best Hotels in Rishikesh",
+    "Best Hostels in Rishikesh",
+    "Best Restaurants & Cafes in Rishikesh",
+    "Places to Visit in Rishikesh",
+    "Bungee Jumping Operator Comparisons Rishikesh"
+  ],
+
+  "category_to_cta_mapping": {
+    "Bungee Jumping in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/bungee",
+      "cta_text": "Compare all bungee jumping options on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Ask Bucketlistt on WhatsApp"
+    },
+    "River Rafting in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/rafting",
+      "cta_text": "Book river rafting in Rishikesh on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Chat with Bucketlistt for rafting packages"
+    },
+    "Flying Fox & Zipline Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/rishikesh/fying-fox-tandem-or-triple-ride",
+      "cta_text": "Book Flying Fox (Solo / Tandem / Triple) on Bucketlistt",
+      "secondary_cta_url": "https://www.bucketlistt.com/zipline",
+      "secondary_cta_text": "View all zipline options in Rishikesh"
+    },
+    "Paragliding in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/paragliding",
+      "cta_text": "Book paragliding in Rishikesh on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "WhatsApp Bucketlistt for paragliding slots"
+    },
+    "Giant Swing & Tower Swing Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/bungee",
+      "cta_text": "Book Giant Swing or combo packages on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Ask Bucketlistt about combo deals"
+    },
+    "Hot Air Balloon Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Explore hot air balloon and other activities on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Check availability on WhatsApp"
+    },
+    "Adventure Camping Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Find camping + adventure packages on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Chat with Bucketlistt for camping packages"
+    },
+    "Things To Do in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Browse all Rishikesh adventures on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Plan your Rishikesh trip with Bucketlistt"
+    },
+    "Multi-Activity Adventure Combos Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/bungee",
+      "cta_text": "View all combo packages on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Custom combo enquiry on WhatsApp"
+    },
+    "Best Hotels in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Plan your Rishikesh adventure stay with Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Ask Bucketlistt for Rishikesh stay recommendations"
+    },
+    "Best Hostels in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Add adventure activities to your Rishikesh hostel trip via Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Chat with Bucketlistt — budget trip planning"
+    },
+    "Best Restaurants & Cafes in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Pair your Rishikesh food trail with an adventure activity — book on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Plan your full Rishikesh day with Bucketlistt"
+    },
+    "Places to Visit in Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Combine sightseeing with adventure — browse Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Ask Bucketlistt for a Rishikesh activity + sightseeing itinerary"
+    },
+    "Rishikesh Itineraries & Trip Plans": {
+      "cta_url": "https://www.bucketlistt.com/",
+      "cta_text": "Book all your Rishikesh adventure activities in one place on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Get a custom Rishikesh itinerary from Bucketlistt on WhatsApp"
+    },
+    "Bungee Jumping Operator Comparisons Rishikesh": {
+      "cta_url": "https://www.bucketlistt.com/bungee",
+      "cta_text": "Compare all bungee jumping operators — Himalayan Bungy, Splash Bungy, Maa Ganga Bungy — on Bucketlistt",
+      "secondary_cta_url": "https://wa.me/918511838237",
+      "secondary_cta_text": "Ask Bucketlistt which bungee operator is right for you"
+    }
+  }
+}

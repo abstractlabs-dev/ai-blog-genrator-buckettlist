@@ -1,0 +1,117 @@
+services:
+  # Main blog generator API
+  blog-generator:
+    build: .
+    container_name: blog-generator-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - GOOGLE_AI_STUDIO_API_KEY=${GOOGLE_AI_STUDIO_API_KEY}
+      - API_KEY=${API_KEY}
+      - BRAND_NAME=${BRAND_NAME}
+      - INDUSTRY_NAME=${INDUSTRY_NAME}
+      - BRAND_MENTION_RATIO=${BRAND_MENTION_RATIO}
+      - TARGET_CITY=${TARGET_CITY}
+      - TARGET_STATE=${TARGET_STATE}
+      - TEMPERATURE=${TEMPERATURE}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - IMAGE_MODEL=${IMAGE_MODEL}
+      - MIN_WORD_COUNT=${MIN_WORD_COUNT}
+      - MAX_WORD_COUNT=${MAX_WORD_COUNT}
+      - SEO_THRESHOLD=${SEO_THRESHOLD}
+      - MAX_ARTICLE_RETRIES=${MAX_ARTICLE_RETRIES}
+      - IMAGE_GENERATION_RATIO=${IMAGE_GENERATION_RATIO}
+      - WEBSITE_START_DATE=${WEBSITE_START_DATE}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORDPRESS_BASE_URL=${WORDPRESS_BASE_URL}
+      - WORDPRESS_USERNAME=${WORDPRESS_USERNAME}
+      - WORDPRESS_TOKEN=${WORDPRESS_TOKEN}
+      - SCRAPER_RAW_MODE=${SCRAPER_RAW_MODE}
+      - DEFAULT_LINK_URL=${DEFAULT_LINK_URL}
+      - DEFAULT_LINK_TEXT=${DEFAULT_LINK_TEXT}
+      - BRAND_PROMOTION_ENABLED=${BRAND_PROMOTION_ENABLED}
+      - SCRAPER_PAGE_LOAD_TIMEOUT=${SCRAPER_PAGE_LOAD_TIMEOUT}
+      - SCRAPER_ELEMENT_WAIT_TIMEOUT=${SCRAPER_ELEMENT_WAIT_TIMEOUT}
+      - SCRAPER_MAX_RETRIES=${SCRAPER_MAX_RETRIES}
+      - SCRAPER_RETRY_DELAY=${SCRAPER_RETRY_DELAY}
+      - SCRAPER_SITE_GAP=${SCRAPER_SITE_GAP}
+      - MAX_TOTAL_ARTICLES=${MAX_TOTAL_ARTICLES}
+      - WEAVIATE_HOST=weaviate
+      - WEAVIATE_PORT=8080
+      - WEAVIATE_GRPC_PORT=50051
+      # - BLOGGER_BLOG_ID=${BLOGGER_BLOG_ID}
+      # - BLOGGER_TOKEN_FILE=${BLOGGER_TOKEN_FILE}
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./src/credentials:/app/credentials
+      - ./api:/app/api
+      - ./prompts:/app/prompts
+      - ./tokens:/app/tokens
+
+    depends_on:
+      - redis
+      - weaviate
+    restart: unless-stopped
+    networks:
+      - blog-network
+
+  # Redis for LiteLLM caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: blog-generator-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Weaviate vector database for article similarity and internal linking
+  weaviate:
+    image: semitechnologies/weaviate:1.27.0
+    container_name: blog-generator-weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-openai'
+      ENABLE_MODULES: 'text2vec-openai'
+      # Optional. Leave empty to let the app fall back to CSV-based internal links.
+      OPENAI_APIKEY: ${WEAVIATE_OPENAI_API_KEY}
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    restart: unless-stopped
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+
+networks:
+  blog-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  weaviate-data:
+    driver: local

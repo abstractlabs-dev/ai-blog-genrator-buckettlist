@@ -1,0 +1,322 @@
+{
+  "_meta": {
+    "purpose": "Topic-categorized social media assets for inline injection into articles. Articles ONLY receive assets matching their exact category. No cross-category mixing.",
+    "platform_types": ["instagram_reel", "youtube_video"],
+    "injection_rule": "Assets are placed in body paragraphs AFTER the 4th paragraph only. NEVER in the first 3 paragraphs or intro section.",
+    "link_format": "Rendered as contextual anchor tags with descriptive text, or as 'Watch / See this:' callout blocks",
+    "last_updated": "2026-05-03",
+    "total_assets": 26
+  },
+
+  "categories": {
+
+    "bungee_jumping": {
+      "_description": "All bungee jumping assets — use ONLY in articles about bungee jumping, giant swing, SCAD jump, and rope jump. DO NOT inject into rafting, paragliding, or camping articles.",
+      "_inject_when_article_contains": ["bungee", "bungy", "giant swing", "SCAD", "rope jump", "valley jump", "splash bungee", "himalayan bungy", "jumpin heights", "maa ganga bungee"],
+      "assets": [
+        {
+          "id": "bungee_001",
+          "title": "Difference Between Bungee Jumping Types — Himalayan Bungy Explained",
+          "url": "https://www.instagram.com/p/DP1ZxKskkFd/",
+          "platform": "instagram_reel",
+          "topic_tags": ["bungee comparison", "types of bungee", "himalayan bungy"],
+          "suggested_anchor_text": "See the difference between bungee jump styles on Instagram",
+          "suggested_context": "Use near paragraphs comparing different bungee jumping styles or operators"
+        },
+        {
+          "id": "bungee_002",
+          "title": "Himalayan Bungy — India's Highest Bungee Experience",
+          "url": "https://www.instagram.com/p/DWO4LbhAaqL/",
+          "platform": "instagram_reel",
+          "topic_tags": ["himalayan bungy", "117m bungee", "highest bungee rishikesh"],
+          "suggested_anchor_text": "Watch Himalayan Bungy Rishikesh in action",
+          "suggested_context": "Use near paragraphs about Himalayan Bungy (117m / 111m)"
+        },
+        {
+          "id": "bungee_003",
+          "title": "Couple Bungy Jump — Himalayan Tandem 111 Metres",
+          "url": "https://www.instagram.com/p/DWCMWIfj14M/",
+          "platform": "instagram_reel",
+          "topic_tags": ["couple bungee", "tandem bungee", "himalayan 111m"],
+          "suggested_anchor_text": "Watch a real couple tandem bungee jump at 111 metres",
+          "suggested_context": "Use in articles about couple/tandem bungee jumping in Rishikesh"
+        },
+        {
+          "id": "bungee_004",
+          "title": "Jim Corbett Rooftop Bungee — Himalayan Bungy",
+          "url": "https://www.instagram.com/p/DUvQQz0jJWr/",
+          "platform": "instagram_reel",
+          "topic_tags": ["jim corbett bungee", "rooftop bungee", "himalayan bungy"],
+          "suggested_anchor_text": "See the Jim Corbett Rooftop Bungee reel",
+          "suggested_context": "Use in articles mentioning Jim Corbett bungee or rooftop bungee variants"
+        },
+        {
+          "id": "bungee_005",
+          "title": "Jim Corbett Rooftop Bungee — Alternate Angle",
+          "url": "https://www.instagram.com/p/DUvQGZHjH48/",
+          "platform": "instagram_reel",
+          "topic_tags": ["jim corbett bungee", "rooftop bungee", "himalayan bungy"],
+          "suggested_anchor_text": "Jim Corbett Rooftop Bungee experience reel",
+          "suggested_context": "Secondary embed for Jim Corbett bungee articles"
+        },
+        {
+          "id": "bungee_006",
+          "title": "Jumping Heights — Couple Valley Cut Rope Jump (83M)",
+          "url": "https://www.instagram.com/p/DXGSdGhjH11/",
+          "platform": "instagram_reel",
+          "topic_tags": ["jumpin heights", "valley rope jump", "83m bungee", "couple bungee"],
+          "suggested_anchor_text": "Watch the couple Valley Cut Rope Jump at Jumpin Heights",
+          "suggested_context": "Use in articles about Jumpin Heights or Valley Rope Jump experience"
+        },
+        {
+          "id": "bungee_007",
+          "title": "Manali Bungee Jumping — Himalayan Bungy",
+          "url": "https://www.instagram.com/p/DW9dyywjLF3/",
+          "platform": "instagram_reel",
+          "topic_tags": ["manali bungee", "himalayan bungy", "bungee india"],
+          "suggested_anchor_text": "See Manali Bungee by Himalayan Bungy",
+          "suggested_context": "Use in articles comparing bungee locations across India"
+        },
+        {
+          "id": "bungee_008",
+          "title": "Splash Bungy Experience Video — Rishikesh",
+          "url": "https://www.instagram.com/p/DWQxT9pCdaL/",
+          "platform": "instagram_reel",
+          "topic_tags": ["splash bungy", "109m bungee", "water splash bungee"],
+          "suggested_anchor_text": "Watch the Splash Bungy experience at Rishikesh",
+          "suggested_context": "Use in articles about Splash Bungy (109M / 85M) operator"
+        },
+        {
+          "id": "bungee_009",
+          "title": "Maa Ganga Bungee — India's Highest Bungee at Devprayag (200M+)",
+          "url": "https://www.instagram.com/p/DWMs6kbElVX/",
+          "platform": "instagram_reel",
+          "topic_tags": ["maa ganga bungee", "highest bungee india", "devprayag bungee", "200m bungee"],
+          "suggested_anchor_text": "Watch Maa Ganga Bungee — India's highest bungee jump at Devprayag",
+          "suggested_context": "Use in articles about highest bungee in India or Maa Ganga Bungee"
+        },
+        {
+          "id": "bungee_010",
+          "title": "Maa Ganga Bungee — Devprayag Jump Footage (Alternate)",
+          "url": "https://www.instagram.com/p/DWEfgiNj1je/",
+          "platform": "instagram_reel",
+          "topic_tags": ["maa ganga bungee", "highest bungee india", "devprayag bungee"],
+          "suggested_anchor_text": "Maa Ganga Bungee at Devprayag — another angle",
+          "suggested_context": "Secondary embed for Maa Ganga Bungee / highest bungee India articles"
+        },
+        {
+          "id": "bungee_011",
+          "title": "Splash Bungy 85M Freestyle — Starting at ₹2,500",
+          "url": "https://www.instagram.com/p/DVwOczIjw5F/",
+          "platform": "instagram_reel",
+          "topic_tags": ["splash bungy", "85m freestyle", "bungee price 2500"],
+          "suggested_anchor_text": "Splash Bungy 85M Freestyle reel — from ₹2,500",
+          "suggested_context": "Use in articles about budget bungee jumping or Splash Bungy pricing"
+        },
+        {
+          "id": "bungee_012",
+          "title": "Splash Bungy 85M Freestyle — Alternate View",
+          "url": "https://www.instagram.com/p/DVwOkTBDwtO/",
+          "platform": "instagram_reel",
+          "topic_tags": ["splash bungy", "85m freestyle", "bungee price 2500"],
+          "suggested_anchor_text": "Another look at Splash Bungy 85M Freestyle experience",
+          "suggested_context": "Secondary embed for Splash Bungy price / value articles"
+        },
+        {
+          "id": "bungee_013",
+          "title": "YouTube: Everything to Know About Himalayan Bungy (111M & 117M)",
+          "url": "https://www.youtube.com/watch?v=19Xi1w0_euo&t=97s",
+          "platform": "youtube_video",
+          "topic_tags": ["himalayan bungy", "111m bungee", "117m bungee", "bungee guide"],
+          "suggested_anchor_text": "Watch: Complete guide to Himalayan Bungy 111M and 117M on YouTube",
+          "suggested_context": "Use in deep-dive articles about Himalayan Bungy or bungee height comparisons — high authority embed"
+        }
+      ]
+    },
+
+    "river_rafting": {
+      "_description": "All river rafting assets — use ONLY in articles about river rafting, white water rafting, rafting routes, rafting packages.",
+      "_inject_when_article_contains": ["river rafting", "rafting", "white water", "shivpuri rafting", "kaudiyala", "brahmpuri", "marine drive rafting"],
+      "assets": [
+        {
+          "id": "rafting_001",
+          "title": "Rafting Safety — What You Must Know Before You Go",
+          "url": "https://www.instagram.com/p/DPN9DVCEuzB/",
+          "platform": "instagram_reel",
+          "topic_tags": ["rafting safety", "river rafting tips", "safe rafting rishikesh"],
+          "suggested_anchor_text": "Watch: Rafting safety tips you must know before your trip",
+          "suggested_context": "Use in safety sections of rafting articles or beginner rafting guides"
+        },
+        {
+          "id": "rafting_002",
+          "title": "River Rafting Safety Guide — Part 2",
+          "url": "https://www.instagram.com/p/DOa3JSQDPMf/",
+          "platform": "instagram_reel",
+          "topic_tags": ["rafting safety", "safe rafting", "rafting precautions"],
+          "suggested_anchor_text": "More rafting safety essentials — watch on Instagram",
+          "suggested_context": "Secondary safety embed for rafting safety articles"
+        },
+        {
+          "id": "rafting_003",
+          "title": "Rafting Safety — Gear, Commands and What to Expect",
+          "url": "https://www.instagram.com/p/DOs7OJrDyYj/",
+          "platform": "instagram_reel",
+          "topic_tags": ["rafting safety", "rafting gear", "rafting commands"],
+          "suggested_anchor_text": "Rafting safety gear and commands explained — Instagram reel",
+          "suggested_context": "Use in articles covering safety equipment or first-time rafting advice"
+        },
+        {
+          "id": "rafting_004",
+          "title": "71-Year-Old Does River Rafting — Real Customer Story",
+          "url": "https://www.instagram.com/p/DWQryldjwP-/",
+          "platform": "instagram_reel",
+          "topic_tags": ["rafting experience", "family rafting", "senior rafting", "real customers"],
+          "suggested_anchor_text": "Watch: A 71-year-old rafter's experience with Bucketlistt",
+          "suggested_context": "Use in articles about family rafting, age limits, or 'is rafting safe' queries"
+        },
+        {
+          "id": "rafting_005",
+          "title": "People Enjoying River Rafting — Bucketlistt Customers",
+          "url": "https://www.instagram.com/p/DWBmtPGE6Xb/",
+          "platform": "instagram_reel",
+          "topic_tags": ["rafting experience", "customer reviews", "rafting fun"],
+          "suggested_anchor_text": "See real customers enjoying river rafting with Bucketlistt",
+          "suggested_context": "Use near social proof sections or 'why book with Bucketlistt' paragraphs"
+        },
+        {
+          "id": "rafting_006",
+          "title": "Dronecraft River Rafting — Aerial Footage",
+          "url": "https://www.instagram.com/p/DW9KnyYDbEB/",
+          "platform": "instagram_reel",
+          "topic_tags": ["dronecraft rafting", "river rafting footage", "rafting aerial view"],
+          "suggested_anchor_text": "Aerial view of Dronecraft River Rafting — watch the reel",
+          "suggested_context": "Use in articles mentioning Dronecraft operator or rafting route overviews"
+        }
+      ]
+    },
+
+    "paragliding": {
+      "_description": "All paragliding assets — use ONLY in articles about paragliding in Rishikesh.",
+      "_inject_when_article_contains": ["paragliding", "paraglide", "tandem flight", "gliding"],
+      "assets": [
+        {
+          "id": "paragliding_001",
+          "title": "Best Paragliding Schools and What to Look For",
+          "url": "https://www.instagram.com/p/DI1fNQQoUaa/",
+          "platform": "instagram_reel",
+          "topic_tags": ["paragliding schools", "best paragliding", "choose paragliding operator"],
+          "suggested_anchor_text": "How to choose the best paragliding school — watch on Instagram",
+          "suggested_context": "Use in articles about choosing a paragliding operator or best paragliding in Rishikesh"
+        },
+        {
+          "id": "paragliding_002",
+          "title": "Mistakes to Avoid While Paragliding",
+          "url": "https://www.instagram.com/p/DJUyPKHTPTv/",
+          "platform": "instagram_reel",
+          "topic_tags": ["paragliding mistakes", "paragliding safety", "paragliding tips"],
+          "suggested_anchor_text": "Common paragliding mistakes to avoid — Instagram safety reel",
+          "suggested_context": "Use in safety sections or beginner paragliding tip articles"
+        },
+        {
+          "id": "paragliding_003",
+          "title": "Paragliding Experience Reel — Rishikesh",
+          "url": "https://www.instagram.com/p/DWOkvMtDwjl/",
+          "platform": "instagram_reel",
+          "topic_tags": ["paragliding rishikesh", "paragliding experience", "paragliding views"],
+          "suggested_anchor_text": "Watch a real paragliding experience over Rishikesh",
+          "suggested_context": "Use in articles describing the paragliding experience or views"
+        },
+        {
+          "id": "paragliding_004",
+          "title": "YouTube: Everything to Know About Paragliding in Rishikesh",
+          "url": "https://www.youtube.com/watch?v=AKdbaZ5pWj0&feature=youtu.be",
+          "platform": "youtube_video",
+          "topic_tags": ["paragliding guide", "paragliding rishikesh complete guide", "paragliding tips"],
+          "suggested_anchor_text": "Watch: Complete paragliding guide for Rishikesh on YouTube",
+          "suggested_context": "Use as a primary authority embed in paragliding guide or price articles"
+        }
+      ]
+    },
+
+    "spiritual_cultural": {
+      "_description": "Assets about Rishikesh spiritual/cultural experiences — use in articles about Ganga Aarti, temples, spiritual activities.",
+      "_inject_when_article_contains": ["ganga aarti", "triveni ghat", "spiritual", "temple", "aarti", "rishikesh culture"],
+      "assets": [
+        {
+          "id": "spiritual_001",
+          "title": "Ganga Aarti First Row Tickets — Book Through Bucketlistt",
+          "url": "https://www.instagram.com/p/DXTmlnJEtxI/",
+          "platform": "instagram_reel",
+          "topic_tags": ["ganga aarti", "triveni ghat", "rishikesh aarti", "first row tickets"],
+          "suggested_anchor_text": "Watch the Ganga Aarti experience — first row seats available on Bucketlistt",
+          "suggested_context": "Use in articles about Ganga Aarti, spiritual Rishikesh, or 'things to do in Rishikesh' articles"
+        }
+      ]
+    },
+
+    "brand_social_proof": {
+      "_description": "Influencer and review content — use in any article where social proof or 'why book with Bucketlistt' sections appear. Safe to inject across categories as supporting evidence.",
+      "_inject_when_article_contains": ["bucketlistt", "book now", "why choose", "verified", "trusted operator", "adventure booking"],
+      "assets": [
+        {
+          "id": "social_proof_001",
+          "title": "What Influencers Say About Bucketlistt — Review Reel 1",
+          "url": "https://www.instagram.com/p/DU7LBSUEg3e/",
+          "platform": "instagram_reel",
+          "topic_tags": ["influencer review", "bucketlistt review", "social proof"],
+          "suggested_anchor_text": "See what travel influencers say about Bucketlistt on Instagram",
+          "suggested_context": "Use in conclusion sections or 'why book with Bucketlistt' paragraphs only"
+        },
+        {
+          "id": "social_proof_002",
+          "title": "What Influencers Say About Bucketlistt — Review Reel 2",
+          "url": "https://www.instagram.com/p/DVRPFj2EvtY/",
+          "platform": "instagram_reel",
+          "topic_tags": ["influencer review", "bucketlistt review", "social proof"],
+          "suggested_anchor_text": "More influencer reviews of Bucketlistt adventures",
+          "suggested_context": "Secondary social proof embed — use in conclusion or CTA section only"
+        }
+      ]
+    },
+
+    "brand_general": {
+      "_description": "About Bucketlistt brand content — use in any article type but ONLY in the conclusion / about-the-operator paragraph, never in the intro.",
+      "_inject_when_article_contains": ["adventure sports india", "book adventure", "bucketlistt", "safe adventure", "adventure platform"],
+      "assets": [
+        {
+          "id": "brand_001",
+          "title": "About Bucketlistt — How We're Making Adventure Sports Safer in India",
+          "url": "https://www.instagram.com/p/DR6xPioDC7Y/",
+          "platform": "instagram_reel",
+          "topic_tags": ["about bucketlistt", "adventure safety india", "bucketlistt mission"],
+          "suggested_anchor_text": "How Bucketlistt is making adventure sports safer across India",
+          "suggested_context": "Use in conclusion section or brand trust paragraphs — never in intro"
+        }
+      ]
+    }
+  },
+
+  "category_to_media_mapping": {
+    "Bungee Jumping in Rishikesh":         ["bungee_jumping"],
+    "Giant Swing & Tower Swing Rishikesh": ["bungee_jumping"],
+    "Flying Fox & Zipline Rishikesh":      ["bungee_jumping"],
+    "River Rafting in Rishikesh":          ["river_rafting"],
+    "Paragliding in Rishikesh":            ["paragliding"],
+    "Hot Air Balloon Rishikesh":           ["brand_social_proof"],
+    "Adventure Camping Rishikesh":         ["brand_social_proof"],
+    "Things To Do in Rishikesh":           ["bungee_jumping", "river_rafting", "brand_social_proof"],
+    "Spiritual & Cultural Rishikesh":      ["spiritual_cultural", "brand_general"],
+    "Multi-Activity Adventure Combos":     ["bungee_jumping", "river_rafting"],
+    "Rishikesh Adventure Sports Guide":    ["bungee_jumping", "river_rafting", "paragliding"],
+    "Solo Travel Rishikesh":               ["brand_social_proof"],
+    "Couple Trips Rishikesh":              ["bungee_jumping"],
+    "Family Adventures Rishikesh":         ["river_rafting", "brand_social_proof"]
+  },
+
+  "injection_limits": {
+    "max_instagram_per_article": 3,
+    "max_youtube_per_article": 1,
+    "min_paragraph_before_first_link": 4,
+    "preferred_placement": ["body_section_2", "body_section_3", "faq_section", "conclusion"]
+  }
+}

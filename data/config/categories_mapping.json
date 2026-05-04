@@ -1,0 +1,14 @@
+{
+    "parents": {
+        "generic_product_category_1": 1,
+        "generic_industry_category_1": 2
+    },
+    "generic_product_category_1": {
+        "dummy_subcategory_1": 10,
+        "dummy_subcategory_2": 11
+    },
+    "generic_industry_category_1": {
+        "dummy_subcategory_3": 20,
+        "dummy_subcategory_4": 21
+    }
+}

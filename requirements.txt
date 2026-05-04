@@ -1,0 +1,58 @@
+# Core dependencies (required)
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+Requests>=2.28.0
+Pillow>=10.0.0
+markdown>=3.4.0
+
+# Web scraping dependencies (required for scraper functionality)
+beautifulsoup4>=4.11.0
+html5lib>=1.1  # HTML parser for BeautifulSoup
+undetected-chromedriver>=3.5.0
+selenium>=4.15.0
+lxml>=4.9.0
+
+# LLM API wrapper with optimization (recommended)
+litellm>=1.17.0
+# For caching and performance optimization
+redis>=5.0.0
+
+# LangChain components for vector stores (optional - system has fallbacks)
+langchain>=0.1.0
+langchain-community>=0.0.20
+sentence-transformers>=2.2.0
+
+# Vector database for similarity search (optional - system has fallbacks)
+# For GPU support, install 'faiss-gpu' instead of faiss-cpu
+faiss-cpu>=1.7.0
+
+# FastAPI dependencies (required for API functionality)
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Additional optimization dependencies
+aiohttp>=3.9.0  # For async HTTP requests
+tenacity>=8.2.0  # For retry logic
+
+# Weaviate and gRPC dependencies (with compatible versions)
+protobuf>=4.21.0,<5.0.0  # Compatible with grpcio
+grpcio>=1.60.0,<2.0.0    # Compatible with protobuf 4.x
+grpcio-tools>=1.60.0,<2.0.0
+weaviate-client>=4.1.0
+
+# Google Blogger API dependencies (optional - for Blogger publishing)
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+google-auth-oauthlib>=0.5.0
+google-auth-httplib2>=0.1.0
+
+# Tumblr API dependencies (optional - for Tumblr publishing)
+pytumblr>=0.1.0
+
+# Installation notes:
+# - The system will work without LangChain/FAISS (vector store disabled)
+# - The system will work without litellm (uses offline fallback content)
+# - Web scraping requires all scraping dependencies to be installed
+# - Redis is optional but recommended for LiteLLM caching
+# - For production, consider using gunicorn with uvicorn workers

@@ -1,0 +1,119 @@
+{
+  "_meta": {
+    "purpose": "Partner brand configuration — these are brands that can be mentioned contextually (NOT as paid promotions) in comparison, 'best of', and activity guide articles on placesinrishikesh.com. Mentioning multiple verified operators by name is a Google E-E-A-T positive signal.",
+    "usage_rule": "Partner brands may be named in body paragraphs AFTER paragraph 4. Never in the introduction. Never presented as exclusive sponsors. Always presented as 'one of the options available' alongside Bucketlistt.",
+    "last_updated": "2026-05-04"
+  },
+
+  "partner_brands": {
+
+    "himalayan_bungy": {
+      "name": "Himalayan Bungy",
+      "category": "Bungee Jumping",
+      "description": "Operates India's highest bungee jumping platforms in Rishikesh — Himalayan Bungy (117m) and Himalayan Freestyle (111m). Also operates at Manali and Jim Corbett.",
+      "website": "https://www.himalayanbungy.com/",
+      "instagram": "https://www.instagram.com/himalayan_bungy/",
+      "price_range": "Rs. 3,500 – Rs. 5,000",
+      "location": "Mohanchatti, Rishikesh, Uttarakhand",
+      "products": [
+        "Himalayan Bungy — 117 metres",
+        "Himalayan Freestyle Bungy — 111 metres",
+        "Himalayan Tandem Bungy — 111 metres"
+      ],
+      "mention_context": [
+        "Articles comparing bungee operators in Rishikesh",
+        "Articles about highest bungee jumping in India",
+        "Articles about Himalayan Bungy specifically",
+        "Bungee jumping price comparison articles"
+      ],
+      "media_asset_ids": ["bungee_002", "bungee_003", "bungee_004", "bungee_005", "bungee_007", "bungee_013"],
+      "suggested_mention_pattern": "Himalayan Bungy offers one of Rishikesh's most iconic jumps at 117 metres — you can compare all operators and book through <a href=\"https://www.bucketlistt.com/bungee\" target=\"_blank\" rel=\"noopener\">Bucketlistt</a>.",
+      "do_not_mention_in": ["Rafting articles", "Paragliding articles", "Camping articles"]
+    },
+
+    "splash_bungy": {
+      "name": "Splash Bungy",
+      "category": "Bungee Jumping",
+      "description": "Adventure operator specializing in bungee jumping near the Ganga river in Rishikesh. Known for their 85M Freestyle and 109M Splash Bungy experience where the jumper touches the water.",
+      "website": "https://www.splashbungy.com/",
+      "price_range": "Rs. 2,500 – Rs. 4,000",
+      "location": "Rishikesh, Uttarakhand",
+      "products": [
+        "Splash Bungy — 109 metres (touches the Ganga)",
+        "Freestyle Bungy — 85 metres",
+        "Group Bungy packages"
+      ],
+      "mention_context": [
+        "Bungee operator comparison articles",
+        "Budget bungee jumping articles",
+        "Splash Bungy-specific articles",
+        "Articles about unique bungee experiences (water-touch)"
+      ],
+      "media_asset_ids": ["bungee_008", "bungee_011", "bungee_012"],
+      "suggested_mention_pattern": "For a unique experience, Splash Bungy at 109 metres lets you touch the Ganga river mid-jump — compare their packages with other operators on <a href=\"https://www.bucketlistt.com/bungee\" target=\"_blank\" rel=\"noopener\">Bucketlistt</a>.",
+      "do_not_mention_in": ["Rafting articles", "Paragliding articles", "Camping articles"]
+    },
+
+    "whynotfly": {
+      "name": "WhyNotFly",
+      "category": "Paragliding",
+      "description": "Paragliding operator in Rishikesh offering tandem paragliding flights. Known for safety standards and experienced pilots. Caters to first-time flyers and experienced gliders.",
+      "website": "https://www.whynotfly.in/",
+      "price_range": "Rs. 2,500 – Rs. 4,500",
+      "location": "Rishikesh, Uttarakhand",
+      "products": [
+        "Tandem Paragliding — 7 minutes",
+        "Tandem Paragliding — 20 minutes",
+        "Extended paragliding with photo/video"
+      ],
+      "mention_context": [
+        "Paragliding in Rishikesh articles",
+        "Best paragliding operators Rishikesh comparison",
+        "Safe paragliding for beginners Rishikesh",
+        "Paragliding price comparison articles"
+      ],
+      "media_asset_ids": ["paragliding_001", "paragliding_002", "paragliding_003", "paragliding_004"],
+      "suggested_mention_pattern": "WhyNotFly is one of Rishikesh's well-regarded paragliding operators, particularly suited for first-time flyers. Compare all paragliding options and book via <a href=\"https://www.bucketlistt.com/paragliding\" target=\"_blank\" rel=\"noopener\">Bucketlistt</a>.",
+      "do_not_mention_in": ["Bungee articles", "Rafting articles", "Camping articles"]
+    },
+
+    "maa_ganga_bungy": {
+      "name": "Maa Ganga Bungy",
+      "category": "Bungee Jumping",
+      "description": "Operates India's highest bungee jumping platform at 200+ metres above the Ganga river in Devprayag, Uttarakhand. A different location from Rishikesh but often searched alongside Rishikesh bungee.",
+      "website": "https://www.maagangabungy.com/",
+      "price_range": "Rs. 6,000 – Rs. 10,000",
+      "location": "Devprayag, Uttarakhand (near Rishikesh)",
+      "products": [
+        "Maa Ganga Bungy — 200+ metres (India's highest)",
+        "Group packages",
+        "Photography and video packages"
+      ],
+      "mention_context": [
+        "Highest bungee jumping in India articles",
+        "Bungee jumping price comparison articles (mention as premium option)",
+        "Adventure travel Uttarakhand articles",
+        "Devprayag adventure articles"
+      ],
+      "media_asset_ids": ["bungee_009", "bungee_010"],
+      "suggested_mention_pattern": "For the ultimate jump, Maa Ganga Bungy in nearby Devprayag offers India's highest bungee at 200+ metres above the Ganga — though it requires a separate trip from Rishikesh. Book Rishikesh bungee options via <a href=\"https://www.bucketlistt.com/bungee\" target=\"_blank\" rel=\"noopener\">Bucketlistt</a>.",
+      "do_not_mention_in": ["Rafting articles", "Paragliding articles", "Camping articles"]
+    }
+
+  },
+
+  "comparison_article_rules": {
+    "_note": "In comparison articles (e.g., 'Best Bungee Operators in Rishikesh', 'Himalayan Bungy vs Splash Bungy'), ALL partner brands in the relevant category MUST be mentioned. This is the editorial transparency standard that Google rewards.",
+    "required_structure_for_comparison": [
+      "Mention each operator: name, height/product, price range",
+      "Neutral tone — do not say any operator is 'better'",
+      "Conclude with: 'Compare and book all operators on Bucketlistt'",
+      "CTA must go to Bucketlistt, not directly to operator websites"
+    ],
+    "forbidden": [
+      "Do NOT link directly to competitor operator booking pages",
+      "Do NOT say 'Bucketlistt is cheaper than Himalayan Bungy'",
+      "Do NOT fabricate prices or heights"
+    ]
+  }
+}

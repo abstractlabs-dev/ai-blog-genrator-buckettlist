@@ -1,0 +1,79 @@
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        [MASTER]
+init-hook="import sys; sys.path.append('backend')"
+ignore=venv,frontend/node_modules,node_modules,docs,mariadb,mitmproxy,redis,rabbitmq,alembic,tests
+ignore-patterns=
+    .*/frontend/.*,
+    .*/venv/.*,
+    .*/node_modules/.*,
+    .*/workspace_service/projects/.*
+
+[MESSAGES CONTROL]
+disable=
+    C0114, # missing-module-docstring
+    C0115, # missing-class-docstring
+    C0116, # missing-function-docstring
+    R0903, # too-few-public-methods
+    R0801, # duplicate-code
+    F0010, # parse-error (for files without __init__.py)
+    E1136, # unsubscriptable-object (false positive for SQLAlchemy 2.0 Mapped[])
+
+enable=
+    bad-inline-option,        # ❗ Prevent ANY use of `pylint: disable`
+    useless-suppression,      # ❗ Block incorrect/unused suppressions
+    redefined-builtin,
+    redefined-outer-name,
+    unused-import,
+    unused-variable,
+    unused-argument,
+    wrong-import-position,
+    wrong-import-order,
+    wildcard-import,          # ❗ Forbid `from module import *`
+    consider-using-f-string,
+    consider-using-with,
+    simplify-boolean-expression,
+    dangerous-default-value,
+    useless-return,
+    consider-using-dict-comprehension,
+    consider-using-set-comprehension
+
+[FORMAT]
+max-line-length=120
+indent-string='    '
+max-module-lines=700
+
+[DESIGN]
+max-args=6
+max-locals=15
+max-returns=6
+max-branches=12
+max-statements=50
+max-parents=7
+max-attributes=10
+max-public-methods=20
+
+[TYPECHECK]
+ignore-mixin-members=no
+signature-mutators=
+
+[CLASSES]
+defining-attr-methods=__init__, __new__, setUp
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,pk,id
+bad-names=foo,bar,baz,tmp,test
+
+[VARIABLES]
+init-import=no
+
+[REPORTS]
+fail-under=10.0
+
+[SIMILARITIES]
+min-similarity-lines=4
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=yes
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO,pylint: disable
+ignore-paths=workspace_service/projects,workspace_service/scaffolds

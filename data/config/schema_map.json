@@ -1,0 +1,10 @@
+{
+    "mapping": {
+        "product_name": "Product Name",
+        "category": "Category",
+        "feature_1": "Feature 1",
+        "feature_2": "Feature 2",
+        "features": "Key Features"
+    },
+    "id_column": "product_name"
+}

@@ -1,0 +1,42 @@
+{
+    "scraper_targets": {
+        "thrillophilia_rishikesh": {
+            "url": "https://www.thrillophilia.com/cities/rishikesh/things-to-do",
+            "title_selector": "h2.sc-eDnWTT",
+            "sitemap_url": "https://www.thrillophilia.com/sitemap.xml",
+            "sitemap_pattern": "/rishikesh"
+        },
+        "tripadvisor_rishikesh": {
+            "url": "https://www.tripadvisor.com/Attractions-g297654-Activities-Rishikesh_Tehri_Garhwal_District_Uttarakhand.html",
+            "title_selector": "div[data-automation='tourCardTitle']"
+        },
+        "uttarakhand_tourism": {
+            "url": "https://uttarakhandtourism.gov.in/destination/rishikesh",
+            "title_selector": "h2, h3",
+            "sitemap_url": "https://uttarakhandtourism.gov.in/sitemap.xml",
+            "sitemap_pattern": "rishikesh"
+        },
+        "klook_rishikesh": {
+            "url": "https://www.klook.com/en-IN/city/rishikesh-activities/",
+            "title_selector": "h2.card-title, h3"
+        },
+        "getyourguide_rishikesh": {
+            "url": "https://www.getyourguide.com/rishikesh-l97255/",
+            "title_selector": "h2, .activity-card__title"
+        },
+        "incredible_india_rishikesh": {
+            "url": "https://www.incredibleindia.org/content/incredible-india-v2/en/destinations/rishikesh.html",
+            "title_selector": "h1, h2, h3"
+        }
+    },
+    "brand_blacklist": [
+        "makemytrip",
+        "cleartrip",
+        "yatra",
+        "bookmyshow",
+        "adventure nation",
+        "thrill factory",
+        "jumpin heights direct",
+        "book directly with"
+    ]
+}
