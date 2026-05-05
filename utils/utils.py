@@ -27,16 +27,22 @@ logger = logging.getLogger(__name__)
 
 
 class CSVManager:
-    # ── Expanded header: 3 new WordPress tracking columns ─────────────────────
-    # wp_published_url   — live permalink returned by WordPress REST API after publish
-    # wp_published_slug  — actual slug WordPress assigned (confirms no -2/-3 appended)
-    # wp_published_title — article title as WordPress rendered it (catches sanitization)
+    # ── Multi-platform tracking columns ──────────────────────────────────────
+    # wp_published_url      — live WordPress permalink (from WP REST API)
+    # wp_published_slug     — slug WordPress actually assigned
+    # wp_published_title    — title WordPress actually rendered
+    # blogger_published_url — live Blogger post URL (from Blogger API)
+    # tumblr_published_url  — live Tumblr post URL (from Tumblr API)
+    # platforms_published   — comma-separated: e.g. "wordpress,blogger"
     HEADER = [
         'article_no', 'article_id', 'date', 'title',
-        'url',                  # Pre-computed canonical URL (our side)
-        'wp_published_url',     # Live WordPress permalink (from API response)
-        'wp_published_slug',    # Slug WordPress actually used
-        'wp_published_title',   # Title WordPress actually rendered
+        'url',                    # Pre-computed canonical URL (our side)
+        'wp_published_url',       # Live WordPress permalink
+        'wp_published_slug',      # Slug WordPress actually used
+        'wp_published_title',     # Title WordPress actually rendered
+        'blogger_published_url',  # Live Blogger post URL
+        'tumblr_published_url',   # Live Tumblr post URL
+        'platforms_published',    # Comma-sep list of confirmed platforms
         'short_description', 'keywords', 'project_name', 'article_published'
     ]
 
@@ -61,7 +67,7 @@ class CSVManager:
         logger.warning("articles.csv has been RESET to headers only. All previous article records cleared.")
 
     def save_article(self, article: ArticleDraft, short_description: str, product_name: Optional[str] = None) -> str:
-        """Save a newly generated article row. WP columns are empty until publish."""
+        """Save a newly generated article row. Platform columns are empty until publish."""
         existing_articles = self.get_all_articles()
         article_no = len(existing_articles) + 1
         article_id = hashlib.md5(article.title.encode()).hexdigest()[:8]
@@ -75,9 +81,12 @@ class CSVManager:
                 date_str,
                 article.title,
                 article.metadata.canonical_url,
-                "",                              # wp_published_url  — filled after publish
-                "",                              # wp_published_slug — filled after publish
-                "",                              # wp_published_title — filled after publish
+                "",  # wp_published_url
+                "",  # wp_published_slug
+                "",  # wp_published_title
+                "",  # blogger_published_url
+                "",  # tumblr_published_url
+                "",  # platforms_published
                 short_description,
                 ','.join(article.metadata.keywords),
                 product_name if product_name else "",
@@ -123,15 +132,9 @@ class CSVManager:
         wp_title: str,
     ) -> bool:
         """
-        After a successful WordPress publish, write the live WP URL, slug, and
-        rendered title back into the article row.  This is the ground-truth record
-        that prevents slug collisions on subsequent runs.
-
-        Args:
-            article_id:  MD5-hash ID assigned at generation time (8 chars).
-            wp_url:      Full permalink returned by wp_result.get('link').
-            wp_slug:     Slug returned by wp_result.get('slug').
-            wp_title:    Rendered title from wp_result.get('title', {}).get('rendered').
+        After a confirmed WordPress publish, write the live WP URL, slug, rendered
+        title, and append 'wordpress' to platforms_published.
+        Only called when wp_result.get('id') is non-empty.
         """
         articles = self.get_all_articles()
         updated = False
@@ -142,6 +145,11 @@ class CSVManager:
                 row['wp_published_slug']  = wp_slug  or ""
                 row['wp_published_title'] = wp_title or ""
                 row['article_published']  = 'yes'
+                # Append 'wordpress' to platforms_published (avoid duplicates)
+                platforms = [p.strip() for p in (row.get('platforms_published') or '').split(',') if p.strip()]
+                if 'wordpress' not in platforms:
+                    platforms.append('wordpress')
+                row['platforms_published'] = ','.join(platforms)
                 updated = True
             new_rows.append([row.get(h, "") for h in self.header])
 
@@ -160,6 +168,72 @@ class CSVManager:
                 logger.error("Failed to write WP data for article %s: %s", article_id, e)
                 return False
         logger.warning("Article ID %s not found in CSV for WP data update.", article_id)
+        return False
+
+    def update_article_blogger_data(self, article_id: str, blogger_url: str) -> bool:
+        """
+        After a confirmed Blogger publish (blogger_result.get('id') is non-empty),
+        write the live Blogger URL and append 'blogger' to platforms_published.
+        """
+        articles = self.get_all_articles()
+        updated = False
+        new_rows = []
+        for row in articles:
+            if row.get('article_id') == article_id:
+                row['blogger_published_url'] = blogger_url or ""
+                row['article_published']     = 'yes'
+                platforms = [p.strip() for p in (row.get('platforms_published') or '').split(',') if p.strip()]
+                if 'blogger' not in platforms:
+                    platforms.append('blogger')
+                row['platforms_published'] = ','.join(platforms)
+                updated = True
+            new_rows.append([row.get(h, "") for h in self.header])
+
+        if updated:
+            try:
+                with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.header)
+                    writer.writerows(new_rows)
+                logger.info("Blogger data written for article %s | URL: %s", article_id, blogger_url)
+                return True
+            except Exception as e:
+                logger.error("Failed to write Blogger data for article %s: %s", article_id, e)
+                return False
+        logger.warning("Article ID %s not found in CSV for Blogger data update.", article_id)
+        return False
+
+    def update_article_tumblr_data(self, article_id: str, tumblr_url: str) -> bool:
+        """
+        After a confirmed Tumblr publish (tumblr_result.get('id') is non-empty),
+        write the live Tumblr URL and append 'tumblr' to platforms_published.
+        """
+        articles = self.get_all_articles()
+        updated = False
+        new_rows = []
+        for row in articles:
+            if row.get('article_id') == article_id:
+                row['tumblr_published_url'] = tumblr_url or ""
+                row['article_published']    = 'yes'
+                platforms = [p.strip() for p in (row.get('platforms_published') or '').split(',') if p.strip()]
+                if 'tumblr' not in platforms:
+                    platforms.append('tumblr')
+                row['platforms_published'] = ','.join(platforms)
+                updated = True
+            new_rows.append([row.get(h, "") for h in self.header])
+
+        if updated:
+            try:
+                with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.header)
+                    writer.writerows(new_rows)
+                logger.info("Tumblr data written for article %s | URL: %s", article_id, tumblr_url)
+                return True
+            except Exception as e:
+                logger.error("Failed to write Tumblr data for article %s: %s", article_id, e)
+                return False
+        logger.warning("Article ID %s not found in CSV for Tumblr data update.", article_id)
         return False
 
     def get_all_published_slugs(self) -> set:

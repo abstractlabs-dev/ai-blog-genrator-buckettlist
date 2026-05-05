@@ -976,7 +976,6 @@ class BlogGeneratorOrchestrator:
             logger.info("Skipping WordPress publishing (publishing not requested).")
 
         # --- BLOGGER PUBLISHING INTEGRATION ---
-        publish_to_blogger = kwargs.get("publish_to_blogger", False)
         if publish_to_blogger:
             if self.blogger_publisher.is_configured():
                 try:
@@ -986,11 +985,13 @@ class BlogGeneratorOrchestrator:
                         _image_path=img_ctx["path"]
                     )
                     if blogger_result and blogger_result.get('id'):
-                        article.is_published = True  # Sync back to article object
-                        self.csv_manager.update_article_publication_status(meta["id"], "yes")
+                        blogger_url = blogger_result.get('url', '')
+                        article.is_published = True
+                        # Write confirmed Blogger URL + platform tag to CSV
+                        self.csv_manager.update_article_blogger_data(meta["id"], blogger_url)
                         logger.info(
-                            "Successfully published to Blogger! Post ID: %s - Link: %s",
-                            blogger_result.get('id'), blogger_result.get('url')
+                            "Successfully published to Blogger! Post ID: %s | URL: %s",
+                            blogger_result.get('id'), blogger_url
                         )
                     else:
                         logger.warning("Blogger publish returned no ID. Check logs.")
@@ -1000,7 +1001,6 @@ class BlogGeneratorOrchestrator:
                 logger.warning("Publishing requested but Blogger credentials are missing or incomplete in .env.")
 
         # --- TUMBLR PUBLISHING INTEGRATION ---
-        publish_to_tumblr = kwargs.get("publish_to_tumblr", False)
         if publish_to_tumblr:
             if self.tumblr_publisher.is_configured():
                 try:
@@ -1010,11 +1010,13 @@ class BlogGeneratorOrchestrator:
                         _image_path=img_ctx["path"]
                     )
                     if tumblr_result and tumblr_result.get('id'):
+                        tumblr_url = tumblr_result.get('url', '')
                         article.is_published = True
-                        self.csv_manager.update_article_publication_status(meta["id"], "yes")
+                        # Write confirmed Tumblr URL + platform tag to CSV
+                        self.csv_manager.update_article_tumblr_data(meta["id"], tumblr_url)
                         logger.info(
-                            "Successfully published to Tumblr! Post ID: %s - Link: %s",
-                            tumblr_result.get('id'), tumblr_result.get('url')
+                            "Successfully published to Tumblr! Post ID: %s | URL: %s",
+                            tumblr_result.get('id'), tumblr_url
                         )
                     else:
                         logger.warning("Tumblr publish returned no ID. Check logs.")
@@ -1340,7 +1342,13 @@ class BlogGeneratorOrchestrator:
             text += f"- {metric.name}: {metric.score}/{metric.max_score}\n  Feedback: {metric.feedback}\n\n"
         return text
 
-    def generate_batch_articles(self, num_articles: int = 5, publish_to_wordpress: bool = False):
+    def generate_batch_articles(
+        self,
+        num_articles: int = 5,
+        publish_to_wordpress: bool = False,
+        publish_to_blogger: bool = False,
+        publish_to_tumblr: bool = False,
+    ):
         logger.info("Generating a batch of %s articles in Coverage Mode.", num_articles)
 
         # Determine how many brand-specific vs industry-generic articles to generate
@@ -1450,7 +1458,9 @@ class BlogGeneratorOrchestrator:
                     article_type=article_type,
                     override_keywords=seed_info["keywords"],
                     category=seed_info["category"],
-                    publish_to_wordpress=publish_to_wordpress
+                    publish_to_wordpress=publish_to_wordpress,
+                    publish_to_blogger=publish_to_blogger,
+                    publish_to_tumblr=publish_to_tumblr,
                 )
 
                 batch_plan["metadata"].append({
