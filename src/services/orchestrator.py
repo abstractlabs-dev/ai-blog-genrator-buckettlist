@@ -20,8 +20,6 @@ from src.agents import ContentGeneratorAgent, SEOEvaluatorAgent
 from src.scraper import RobustScraper, SCRAPING_AVAILABLE
 from src.llm_client import call_llm, LLM_AVAILABLE
 from src.publishers import WordPressPublisher, BloggerPublisher, TumblrPublisher
-from src.publishers.social_exporter import SocialExporter
-from src.publishers.related_article_finder import RelatedArticleFinder
 from src.stats_manager import StatsManager
 from utils.utils import CSVManager, VectorStoreManager
 from .internal_linking import InternalLinkingService
@@ -43,9 +41,6 @@ class BlogGeneratorOrchestrator:
         self.wp_publisher = WordPressPublisher()
         self.blogger_publisher = BloggerPublisher()
         self.tumblr_publisher = TumblrPublisher()
-        # Social cross-posting exporters
-        self.social_exporter = SocialExporter()
-        self.related_finder  = RelatedArticleFinder(Config.CSV_PATH)
 
     def _create_safe_filename(self, title: str, max_length: int = 50) -> str:
         """Creates a safe filename from a title."""
@@ -1027,45 +1022,6 @@ class BlogGeneratorOrchestrator:
                     logger.error("Tumblr publishing failed: %s", error)
             else:
                 logger.warning("Publishing requested but Tumblr credentials are missing or incomplete in .env.")
-
-        # --- SOCIAL CROSS-POSTING EXPORT (LinkedIn + Medium) ---
-        # Always runs after publishing — generates ready-to-paste JSON files.
-        # Uses the confirmed WP URL if available, otherwise falls back to canonical URL.
-        try:
-            export_url = (
-                wp_link  # Set above if WP publish succeeded
-                if article.is_published and wp_link
-                else getattr(article.metadata, "canonical_url", "")
-            )
-            export_slug = (
-                wp_slug
-                if article.is_published and wp_slug
-                else getattr(article.metadata, "url_slug", "")
-            )
-
-            # Reload corpus so this article itself is NOT in related results
-            # (It won't be since it's not published yet at search time, but reload
-            # ensures any newly published articles from earlier in this batch ARE included)
-            self.related_finder.reload()
-            related_articles = self.related_finder.find(
-                title=article.title,
-                short_description=article.metadata.description or "",
-                top_k=3,
-            )
-
-            social_paths = self.social_exporter.export(
-                article=article,
-                wp_url=export_url,
-                wp_slug=export_slug,
-                related_articles=related_articles,
-            )
-            logger.info(
-                "Social exports ready: LinkedIn → %s | Medium → %s",
-                os.path.basename(social_paths.get("linkedin_path", "")),
-                os.path.basename(social_paths.get("medium_path", "")),
-            )
-        except Exception as social_err:
-            logger.warning("Social export failed (non-critical): %s", social_err)
 
         logger.info("Artifacts processing complete for '%s'.", article.title)
 
