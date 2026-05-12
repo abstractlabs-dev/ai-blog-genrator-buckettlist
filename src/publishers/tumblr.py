@@ -31,14 +31,15 @@ class TumblrPublisher:
         self.consumer_secret = os.getenv("TUMBLR_CONSUMER_SECRET")
         self.token_file = os.getenv("TUMBLR_TOKEN_FILE", os.path.join(Config.PROJECT_ROOT, "tumblr_token.json"))
 
-        if not PYTUMBLR_AVAILABLE:
-            logger.warning("Tumblr publisher initialized but pytumblr library is not installed.")
-            self.client = None
-            return
         self._selector = TumblrAccountSelector(
             rest_client_cls=pytumblr.TumblrRestClient if PYTUMBLR_AVAILABLE else None,
             tumblr_api_available=PYTUMBLR_AVAILABLE,
         )
+
+        if not PYTUMBLR_AVAILABLE:
+            logger.warning("Tumblr publisher initialized but pytumblr library is not installed.")
+            self.client = None
+            return
 
         if not self._selector.is_configured():
             logger.warning(

@@ -1,10 +1,11 @@
 {
     "mapping": {
-        "product_name": "Product Name",
+        "service_name": "Service Name",
         "category": "Category",
-        "feature_1": "Feature 1",
-        "feature_2": "Feature 2",
-        "features": "Key Features"
+        "price_inr": "Price (INR)",
+        "location": "Location",
+        "key_features": "Key Features",
+        "details": "Details"
     },
-    "id_column": "product_name"
+    "id_column": "service_name"
 }

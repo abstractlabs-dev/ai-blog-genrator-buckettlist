@@ -91,7 +91,7 @@ class Config:
 
     # Storage Configuration
     BASE_DIR = os.getenv("APP_DATA_DIR", os.path.join(PROJECT_ROOT, "data"))
-    PROJECT_DATA_CSV = os.path.join(BASE_DIR, "products.csv")  # Renamed from temp.csv
+    PROJECT_DATA_CSV = os.path.join(BASE_DIR, "services.csv")  # Renamed from products.csv
     CSV_PATH = os.path.join(BASE_DIR, "database", "articles.csv")
     USED_TITLES_CSV = os.path.join(BASE_DIR, "database", "used_titles.csv")
     VECTOR_STORE_PATH = os.path.join(BASE_DIR, "vector_store")
@@ -208,7 +208,7 @@ class Config:
     # Templates & Schema
     TEMPLATES = _get_env_json.__func__("TEMPLATES", _templates_cfg)
     SCHEMA_MAP = _get_env_json.__func__("SCHEMA_MAP", _schema_map_cfg.get("mapping", {}))
-    PRODUCT_ID_COL = _schema_map_cfg.get("id_column", os.getenv("PRODUCT_ID_COL", "product_name"))
+    PRODUCT_ID_COL = _schema_map_cfg.get("id_column", os.getenv("PRODUCT_ID_COL", "service_name"))
 
     IMAGE_GENERATION_RATIO = float(os.getenv("IMAGE_GENERATION_RATIO", "1.0"))
 

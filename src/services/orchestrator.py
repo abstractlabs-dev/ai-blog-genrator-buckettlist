@@ -33,9 +33,9 @@ class BlogGeneratorOrchestrator:
         self.content_generator = ContentGeneratorAgent()
         self.seo_evaluator = SEOEvaluatorAgent()
         self.internal_linking = InternalLinkingService(self.csv_manager, self.vector_store)
-        self.covered_products = self.csv_manager.get_covered_products()
+        self.covered_services = self.csv_manager.get_covered_products()
         self._industry_rotation = []
-        self._product_category_rotation = []
+        self._service_category_rotation = []
         self.total_accumulated_cost = 0.0
         # Initialize publishers but don't force usage yet unless needed
         self.wp_publisher = WordPressPublisher()
@@ -501,6 +501,8 @@ class BlogGeneratorOrchestrator:
     def generate_blog(self, title: str, reference_text: str = "", article_type: str = "generic",
                       override_keywords: Optional[list[str]] = None, category: Optional[str] = None,
                       publish_to_wordpress: bool = False,
+                      publish_to_blogger: bool = False,
+                      publish_to_tumblr: bool = False,
                       **kwargs) -> Tuple[ArticleDraft, SEOReport, Optional[Dict]]:
         if not title or not isinstance(title, str) or not title.strip():
             raise ValueError("Title must be a non-empty string.")
@@ -580,13 +582,12 @@ class BlogGeneratorOrchestrator:
             logger.info("Using fixed temperature=%.2f (from .env) for iteration %s", temperature, iteration)
 
             it_article, it_product = self.content_generator.generate_article(
-                title, reference_text, blog_ctx["target_keywords"],
-                temperature=Config.TEMPERATURE,
-                presence_penalty=Config.PRESENCE_PENALTY,
-                frequency_penalty=Config.FREQUENCY_PENALTY,
+                title=title,
+                reference_text=reference_text,
                 article_type=article_type,
-                category=blog_ctx["category"],
-                excluded_products=self.covered_products
+                target_keywords=override_keywords or [],
+                category=category,
+                excluded_products=self.covered_services
             )
 
             # Accumulate cost/tokens from this generation attempt
@@ -628,17 +629,20 @@ class BlogGeneratorOrchestrator:
                 it_article.useful_tokens = last_iteration_tokens
 
                 logger.info("SEO threshold reached. Saving and finalizing this article.")
-                main_category = "Product Categories" if article_type == "brand" else "Industry Categories"
+                main_category = "Service Categories" if article_type == "brand" else "Industry Categories"
                 # Set category attributes on article object for WordPress publishing
                 it_article.category = blog_ctx["category"].strip() if blog_ctx["category"] else ""
                 it_article.parent_category = main_category.strip() if main_category else ""
                 self.save_artifacts(
                     it_article, it_report, article_type, blog_ctx["category"].strip(),
-                    main_category.strip(), it_product, publish_to_wordpress=publish_to_wordpress,
+                    main_category.strip(), it_product,
+                    publish_to_wordpress=publish_to_wordpress,
+                    publish_to_blogger=publish_to_blogger,
+                    publish_to_tumblr=publish_to_tumblr,
                     **kwargs
                 )
-                if it_product and it_product.get('product_name'):
-                    self.covered_products.append(it_product['product_name'])
+                if it_product and it_product.get(Config.PRODUCT_ID_COL):
+                    self.covered_services.append(it_product[Config.PRODUCT_ID_COL])
 
                 # We return the best article which now has the accumulated total stats
                 return it_article, it_report, it_product
@@ -673,45 +677,44 @@ class BlogGeneratorOrchestrator:
                 )
 
         if blog_ctx["best"]["article"] and blog_ctx["best"]["report"]:
-            if blog_ctx["best"]["report"].passed:
+            if not blog_ctx["best"]["report"].passed:
+                logger.warning(
+                    "Article did not meet SEO threshold (score: %s%% < %s%%). Saving best version anyway.",
+                    blog_ctx["best"]["report"].overall_score, Config.SEO_THRESHOLD
+                )
+            else:
                 logger.info(
                     "Successfully generated article with score %s and word count %s.",
                     blog_ctx["best"]["report"].overall_score,
                     blog_ctx["best"]["article"].word_count
                 )
 
-                # Update best article with totals
-                blog_ctx["best"]["article"].cost = blog_ctx["acc_stats"]["cost"]
-                blog_ctx["best"]["article"].token_usage = blog_ctx["acc_stats"]["tokens"]
-                blog_ctx["best"]["article"].useful_cost = last_iteration_cost
-                blog_ctx["best"]["article"].useful_tokens = last_iteration_tokens
+            # Update best article with totals
+            blog_ctx["best"]["article"].cost = blog_ctx["acc_stats"]["cost"]
+            blog_ctx["best"]["article"].token_usage = blog_ctx["acc_stats"]["tokens"]
+            blog_ctx["best"]["article"].useful_cost = last_iteration_cost
+            blog_ctx["best"]["article"].useful_tokens = last_iteration_tokens
 
-                main_category = "Product Categories" if article_type == "brand" else "Industry Categories"
-                # Set category attributes on article object for WordPress publishing
-                blog_ctx["best"]["article"].category = blog_ctx["category"].strip() if blog_ctx["category"] else ""
-                blog_ctx["best"]["article"].parent_category = main_category.strip() if main_category else ""
-                self.save_artifacts(
-                    blog_ctx["best"]["article"], blog_ctx["best"]["report"], article_type,
-                    blog_ctx["category"].strip(), main_category.strip(), blog_ctx["best"]["product"],
-                    publish_to_wordpress=publish_to_wordpress,
-                    **kwargs
-                )
-                if blog_ctx["best"]["product"] and blog_ctx["best"]["product"].get('product_name'):
-                    self.covered_products.append(blog_ctx["best"]["product"]['product_name'])
-
-                return blog_ctx["best"]["article"], blog_ctx["best"]["report"], blog_ctx["best"]["product"]
-
-            error_msg = (
-                f"Blog generation failed: Article did not meet SEO threshold "
-                f"(score: {blog_ctx['best']['report'].overall_score}% < {Config.SEO_THRESHOLD}%). "
-                f"Word count: {blog_ctx['best']['article'].word_count}. Title: '{blog_ctx['best']['article'].title}'"
+            main_category = "Product Categories" if article_type == "brand" else "Industry Categories"
+            # Set category attributes on article object
+            blog_ctx["best"]["article"].category = blog_ctx["category"].strip() if blog_ctx["category"] else ""
+            blog_ctx["best"]["article"].parent_category = main_category.strip() if main_category else ""
+            
+            self.save_artifacts(
+                blog_ctx["best"]["article"], blog_ctx["best"]["report"], article_type,
+                blog_ctx["category"].strip(), main_category.strip(), blog_ctx["best"]["product"],
+                publish_to_wordpress=publish_to_wordpress,
+                publish_to_blogger=publish_to_blogger,
+                publish_to_tumblr=publish_to_tumblr,
+                **kwargs
             )
-            logger.warning(error_msg)
-            raise BlogGenerationError(
-                error_msg,
-                total_tokens=blog_ctx["acc_stats"]["tokens"],
-                total_cost=blog_ctx["acc_stats"]["cost"]
-            )
+            return blog_ctx["best"]["article"], blog_ctx["best"]["report"], blog_ctx["best"]["product"]
+
+        raise BlogGenerationError(
+            "Failed to generate any valid article after all iterations.",
+            total_tokens=blog_ctx["acc_stats"]["tokens"],
+            total_cost=blog_ctx["acc_stats"]["cost"]
+        )
 
         raise BlogGenerationError(
             "Failed to generate any valid article after all iterations.",
@@ -721,7 +724,10 @@ class BlogGeneratorOrchestrator:
 
     def save_artifacts(
         self, article: ArticleDraft, _report: SEOReport, article_type: str, parent_category: str,
-        main_category: str, product: Optional[Dict] = None, publish_to_wordpress: bool = False,
+        main_category: str, product: Optional[Dict] = None,
+        publish_to_wordpress: bool = False,
+        publish_to_blogger: bool = False,
+        publish_to_tumblr: bool = False,
         **kwargs
     ):
 
@@ -741,7 +747,7 @@ class BlogGeneratorOrchestrator:
             "start": datetime.strptime(Config.WEBSITE_START_DATE, "%Y-%m-%d"),
             "end": datetime.now(),
             "generated": None,
-            "product_name": product.get('product_name') if product else None,
+            "product_name": product.get(Config.PRODUCT_ID_COL) if product else None,
             "short_desc": article.metadata.description if article.metadata else "",
             "id": None
         }
@@ -786,7 +792,7 @@ class BlogGeneratorOrchestrator:
                         img_ctx["random_value"], Config.IMAGE_GENERATION_RATIO)
 
         # IMAGE SKIP LOGIC for Blogger and Tumblr
-        if kwargs.get("publish_to_blogger") or kwargs.get("publish_to_tumblr"):
+        if publish_to_blogger or publish_to_tumblr:
             logger.info("Forcing image generation skip for Blogger/Tumblr as requested.")
             img_ctx["should_generate"] = False
 
@@ -1131,10 +1137,16 @@ class BlogGeneratorOrchestrator:
             pp_ctx["p_count"] = pp_ctx["content"].count('<p>')
             if pp_ctx["p_count"] < 10:
                 needed = 10 - pp_ctx["p_count"]
-                extra_ps = []
-                sample_para = Config.TEMPLATES.get("low_word_count_paragraph", "").format(**pp_ctx["context_args"])
-                for _ in range(needed):
-                    extra_ps.append(sample_para)
+                # Draw from a pool of varied Rishikesh paragraphs — never repeat the same one
+                rishikesh_para_pool = [
+                    f"<p>Rishikesh's position at the foothills of the Garhwal Himalayas gives it consistent river flow, reliable thermals for paragliding, and dramatic canyon geography for bungee jumping — all within a 20-kilometre radius of the city centre.</p>",
+                    f"<p>Adventure activities in {Config.TARGET_CITY} are generally available year-round, with the peak seasons running September to November and March to May. Monsoon months (July–August) restrict water-based activities but do not halt all operations.</p>",
+                    f"<p>Booking adventure activities in {Config.TARGET_CITY} at least 2–3 days in advance is strongly recommended during weekends and public holidays, when slots for bungee jumping, paragliding, and rafting fill up quickly.</p>",
+                    f"<p>{Config.TARGET_CITY} has a well-developed adventure tourism infrastructure with certified operators, trained guides, and safety equipment maintained to international standards — making it one of India's safest adventure destinations.</p>",
+                    f"<p>Whether you are travelling solo, as a couple, or with a group, {Config.TARGET_CITY} offers activity formats for every type of traveller. Combo packages that bundle multiple activities are a cost-effective way to maximise your experience in a single day.</p>",
+                ]
+                random.shuffle(rishikesh_para_pool)
+                extra_ps = [rishikesh_para_pool[i % len(rishikesh_para_pool)] for i in range(needed)]
                 pp_ctx["additions"].append("".join(extra_ps))
 
             if '<ul>' not in pp_ctx["content"] and '<ol>' not in pp_ctx["content"]:
@@ -1154,26 +1166,18 @@ class BlogGeneratorOrchestrator:
 
             pp_ctx["city_count"] = pp_ctx["content"].lower().count(Config.TARGET_CITY.lower())
 
-            paragraphs = pp_ctx["content"].split('</p>')
-            if pp_ctx["city_count"] < 4 and len(paragraphs) > 5:
-                # Subtle phrases to inject
-                pp_ctx["local_phrases"] = [
-                    f" (popular in {Config.TARGET_CITY})",
-                    f" - well-suited for {Config.TARGET_CITY} homes -",
-                    f" for local projects in {Config.TARGET_CITY}",
-                    f" to meet standard requirements in {Config.TARGET_CITY}"
+            if pp_ctx["city_count"] < 4:
+                # Append standalone, grammatically complete Rishikesh sentences
+                # as new <p> tags — never mutate inside existing paragraphs
+                location_sentences = [
+                    f"<p>{Config.TARGET_CITY}'s Himalayan foothills setting creates ideal conditions for adventure sports, with consistent river flow for rafting and stable thermals for paragliding available through most of the year.</p>",
+                    f"<p>Getting to {Config.TARGET_CITY} is straightforward: the nearest airport is Jolly Grant (Dehradun), approximately 35 km away, and Haridwar railway station (25 km) connects to all major Indian cities via frequent services.</p>",
+                    f"<p>The adventure sports zone in {Config.TARGET_CITY} runs from Tapovan to Shivpuri — a 15-km stretch along the Ganga that concentrates most activity operators, camps, and booking offices.</p>",
+                    f"<p>For travellers planning their first visit to {Config.TARGET_CITY}, a 2-day itinerary is typically sufficient to experience the flagship activities: river rafting on the Shivpuri stretch and a bungee jump or paragliding session the following morning.</p>",
                 ]
-
-                # Inject into middle paragraphs
-                pp_ctx["indices"] = [2, 4, len(paragraphs)//2, len(paragraphs)-3]
-                for i, idx in enumerate(pp_ctx["indices"]):
-                    if idx < len(paragraphs) and pp_ctx["city_count"] < 4:
-                        # Insert before the closing tag
-                        local_ph = pp_ctx["local_phrases"][i % len(pp_ctx["local_phrases"])]
-                        paragraphs[idx] = paragraphs[idx].rstrip() + local_ph
-                        pp_ctx["city_count"] = "".join(paragraphs).lower().count(Config.TARGET_CITY.lower())
-
-                pp_ctx["content"] = "</p>".join(paragraphs)
+                needed_city = 4 - pp_ctx["city_count"]
+                for i in range(min(needed_city, len(location_sentences))):
+                    pp_ctx["additions"].append(location_sentences[i])
 
             if target_keywords:
                 pp_ctx["infused"] = ", ".join(sorted({kw for kw in target_keywords if isinstance(kw, str)}))
@@ -1372,9 +1376,9 @@ class BlogGeneratorOrchestrator:
             self._industry_rotation = list(Config.INDUSTRY_CATEGORIES) or [Config.get_random_category("generic")]
             random.shuffle(self._industry_rotation)
 
-        if not self._product_category_rotation:
-            self._product_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
-            random.shuffle(self._product_category_rotation)
+        if not self._service_category_rotation:
+            self._service_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
+            random.shuffle(self._service_category_rotation)
 
         # Load scraped articles for seeds
         seeds = {"articles": [], "pool": []}
@@ -1433,10 +1437,10 @@ class BlogGeneratorOrchestrator:
                     seed_info["category"] = self._industry_rotation.pop(0)
                 else:
                     # For Brand-specific, use the product category rotation
-                    if not self._product_category_rotation:
-                        self._product_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
-                        random.shuffle(self._product_category_rotation)
-                    seed_info["category"] = self._product_category_rotation.pop(0)
+                    if not self._service_category_rotation:
+                        self._service_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
+                        random.shuffle(self._service_category_rotation)
+                    seed_info["category"] = self._service_category_rotation.pop(0)
 
                 # Generate the optimized title (rephrased if seed exists)
                 batch_res = {
@@ -1467,9 +1471,9 @@ class BlogGeneratorOrchestrator:
                     "title": batch_res["article"].title,
                     "type": "Brand-Specific" if article_type == "brand" else "Industry-Generic",
                     "category": batch_res["article"].category,
-                    "parent_category": "Product Categories" if article_type == "brand" else "Industry Categories",
+                    "parent_category": "Service Categories" if article_type == "brand" else "Industry Categories",
                     "filename": self._create_safe_filename(batch_res["article"].title) + ".json",
-                    "product": batch_res["product"].get('product_name') if batch_res["product"] else "N/A",
+                    "product": batch_res["product"].get(Config.PRODUCT_ID_COL) if batch_res["product"] else "N/A",
                     "date": batch_res["article"].generated_at.strftime("%Y-%m-%d %H:%M:%S")
                 })
                 print(f"Success! Final SEO Score: {batch_res['report'].overall_score}/100, "

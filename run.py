@@ -1,5 +1,5 @@
 """
-run.py — Interactive Terminal Control Panel
+run.py - Interactive Terminal Control Panel
 ============================================
 Run this file from the project root to get a full interactive menu
 for all article generation and social media export operations.
@@ -18,7 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-# ── Bootstrap path so imports work from project root ──────────────────────────
+# -- Bootstrap path so imports work from project root --------------------------
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,7 +29,7 @@ from src.config import Config
 from src.publishers.social_exporter import SocialExporter
 from src.publishers.related_article_finder import RelatedArticleFinder
 
-# ── Logging: INFO-level to file, WARNING+ to console so the menu stays clean ──
+# -- Logging: INFO-level to file, WARNING+ to console so the menu stays clean --
 logging.basicConfig(
     level=logging.WARNING,
     format="%(levelname)s - %(message)s",
@@ -39,37 +39,43 @@ file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s"))
 logging.getLogger().addHandler(file_handler)
 
+@logging.LoggerAdapter
+class SafeLogger(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        return msg.encode('ascii', 'replace').decode('ascii'), kwargs
+
 logger = logging.getLogger(__name__)
 
-# ── Constants ──────────────────────────────────────────────────────────────────
+# -- Constants ------------------------------------------------------------------
 MAX_SAMPLE_ARTICLES = 5     # User confirmed: cap sample runs at 5
 DEFAULT_WORKERS     = 3     # User confirmed: default concurrency
-BORDER              = "═" * 60
+BORDER              = "-" * 60
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 #  DISPLAY HELPERS
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 
 def _clear():
     os.system("cls" if os.name == "nt" else "clear")
 
 
 def _header():
-    print(f"\n╔{BORDER}╗")
-    print(f"║{'  AI BLOG GENERATOR — CONTROL PANEL':^60}║")
-    print(f"║{'  Rishikesh Adventure Tourism Pipeline':^60}║")
-    print(f"╚{BORDER}╝\n")
+    print(f"\n+{BORDER}+")
+    print(f"|{'  AI BLOG GENERATOR - CONTROL PANEL':^60}|")
+    print(f"|{'  Rishikesh Adventure Tourism Pipeline':^60}|")
+    print(f"|{'-' * 60}|")
+    print(f"+{BORDER}+\n")
 
 
 def _section(title: str):
-    print(f"  ── {title} {'─' * (54 - len(title))}")
+    print(f"  -- {title} {'-' * (54 - len(title))}")
 
 
-def _ok(msg: str):   print(f"  ✅  {msg}")
-def _warn(msg: str): print(f"  ⚠️   {msg}")
-def _err(msg: str):  print(f"  ❌  {msg}")
-def _info(msg: str): print(f"  ℹ️   {msg}")
+def _ok(msg: str):   print(f"  OK: {msg}")
+def _warn(msg: str): print(f"  WARN: {msg}")
+def _err(msg: str):  print(f"  ERR: {msg}")
+def _info(msg: str): print(f"  INFO: {msg}")
 
 
 def _platform_status():
@@ -78,7 +84,7 @@ def _platform_status():
     wp = WordPressPublisher()
     bl = BloggerPublisher()
     tu = TumblrPublisher()
-    icons = {True: "🟢", False: "🔴"}
+    icons = {True: "[OK]", False: "[OFF]"}
     print(
         f"  Platform status: "
         f"WordPress {icons[wp.is_configured()]}  "
@@ -93,10 +99,10 @@ def _print_menu():
 
     _section("ARTICLE GENERATION")
     print("  [1]  Generate sample articles         (no publish, max 5)")
-    print("  [2]  Generate + Publish → WordPress")
-    print("  [3]  Generate + Publish → Blogger")
-    print("  [4]  Generate + Publish → Tumblr")
-    print("  [5]  Generate + Publish → ALL platforms")
+    print("  [2]  Generate + Publish -> WordPress")
+    print("  [3]  Generate + Publish -> Blogger")
+    print("  [4]  Generate + Publish -> Tumblr")
+    print("  [5]  Generate + Publish -> ALL platforms")
     print()
 
     _section("SOCIAL MEDIA EXPORTS  (reads from CSV)")
@@ -108,15 +114,15 @@ def _print_menu():
     _section("UTILITIES")
     print("  [9]  Run competitor scraper")
     print("  [10] View CSV database summary")
-    print("  [11] ⚠️  Reset CSV database  (DANGER — deletes all records)")
+    print("  [11] !! RESET CSV DATABASE !! (DANGER -- deletes all records)")
     print()
     print("  [0]  Exit")
     print()
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 #  INPUT HELPERS
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 
 def _ask_int(prompt: str, min_val: int, max_val: int, default: int) -> int:
     while True:
@@ -134,7 +140,7 @@ def _ask_int(prompt: str, min_val: int, max_val: int, default: int) -> int:
 
 def _ask_workers() -> int:
     return _ask_int(
-        f"  Max concurrent workers (1–10)",
+        f"  Max concurrent workers (1-10)",
         min_val=1, max_val=10, default=DEFAULT_WORKERS
     )
 
@@ -147,9 +153,9 @@ def _confirm(prompt: str) -> bool:
     return input(f"\n  {prompt} (y/n): ").strip().lower() == "y"
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 #  ORCHESTRATOR + CAMPAIGN MANAGER (lazy init)
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 
 _orchestrator = None
 _campaign_manager = None
@@ -159,7 +165,7 @@ def _get_engine():
     """Lazy-initialise the orchestrator and campaign manager on first use."""
     global _orchestrator, _campaign_manager
     if _orchestrator is None:
-        print("\n  ⏳ Initialising pipeline (first time may take a few seconds)…")
+        print("\n  [INFO] Initialising pipeline (first time may take a few seconds)...")
         from src.services import BlogGeneratorOrchestrator
         from src.concurrent_manager import ConcurrentCampaignManager
         Config.ensure_directories()
@@ -169,20 +175,20 @@ def _get_engine():
     return _orchestrator, _campaign_manager
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 #  OPTION HANDLERS
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 
 def _opt_1_sample():
     """Generate 1-5 sample articles (no publish)."""
     print()
-    _info(f"Sample mode — articles are saved locally only (max {MAX_SAMPLE_ARTICLES}).")
+    _info(f"Sample mode - articles are saved locally only (max {MAX_SAMPLE_ARTICLES}).")
     n = _ask_int(
-        f"How many sample articles to generate (1–{MAX_SAMPLE_ARTICLES})",
+        f"How many sample articles to generate (1-{MAX_SAMPLE_ARTICLES})",
         min_val=1, max_val=MAX_SAMPLE_ARTICLES, default=1
     )
     orch, _ = _get_engine()
-    print(f"\n  Generating {n} sample article(s)…\n")
+    print(f"\n  Generating {n} sample article(s)...\n")
     orch.generate_batch_articles(
         num_articles=n,
         publish_to_wordpress=False,
@@ -211,19 +217,19 @@ def _opt_publish(
     # Check credentials
     orch, mgr = _get_engine()
     if publish_wordpress and not orch.wp_publisher.is_configured():
-        _warn("WordPress credentials are not configured in .env — skipping WP publish.")
+        _warn("WordPress credentials are not configured in .env - skipping WP publish.")
         publish_wordpress = False
     if publish_blogger and not orch.blogger_publisher.is_configured():
-        _warn("Blogger credentials are not configured in .env — skipping Blogger publish.")
+        _warn("Blogger credentials are not configured in .env - skipping Blogger publish.")
         publish_blogger = False
     if publish_tumblr and not orch.tumblr_publisher.is_configured():
-        _warn("Tumblr credentials are not configured in .env — skipping Tumblr publish.")
+        _warn("Tumblr credentials are not configured in .env - skipping Tumblr publish.")
         publish_tumblr = False
 
     n       = _ask_article_count()
     workers = _ask_workers()
 
-    print(f"\n  🚀 Starting campaign: {n} articles | {workers} workers | {platform_str}\n")
+    print(f"\n  STARTING campaign: {n} articles | {workers} workers | {platform_str}\n")
 
     mgr.run_campaign(
         total_articles=n,
@@ -245,7 +251,7 @@ def _opt_social_export(do_linkedin: bool, do_medium: bool):
     else:
         label = "Medium"
 
-    _info(f"Reading published articles from CSV and generating {label} JSON files…")
+    _info(f"Reading published articles from CSV and generating {label} JSON files...")
 
     if not os.path.exists(Config.CSV_PATH):
         _err("articles.csv not found. Run some articles first.")
@@ -284,7 +290,7 @@ def _opt_social_export(do_linkedin: bool, do_medium: bool):
         kw_raw  = row.get("keywords", "")
         keywords = [k.strip() for k in kw_raw.split(",") if k.strip()]
 
-        print(f"  [{i}/{len(published)}] {title[:55]}…")
+        print(f"  [{i}/{len(published)}] {title[:55]}...")
 
         try:
             meta = Metadata(
@@ -314,15 +320,15 @@ def _opt_social_export(do_linkedin: bool, do_medium: bool):
     print()
     _ok(f"Exported {success}/{len(published)} articles.")
     if do_linkedin:
-        _info(f"LinkedIn JSONs → {Config.SOCIAL_LINKEDIN_DIR}")
+        _info(f"LinkedIn JSONs -> {Config.SOCIAL_LINKEDIN_DIR}")
     if do_medium:
-        _info(f"Medium JSONs   → {Config.SOCIAL_MEDIUM_DIR}")
+        _info(f"Medium JSONs   -> {Config.SOCIAL_MEDIUM_DIR}")
 
 
 def _opt_9_scraper():
     """Run competitor blog scraper."""
     print()
-    _info("Starting competitor scraper…")
+    _info("Starting competitor scraper...")
     orch, _ = _get_engine()
     try:
         orch.run_scraping()
@@ -353,21 +359,21 @@ def _opt_10_csv_summary():
     on_blogger  = sum(1 for r in rows if r.get("blogger_published_url", "").strip())
     on_tumblr   = sum(1 for r in rows if r.get("tumblr_published_url", "").strip())
 
-    print(f"\n  {'─'*54}")
+    print(f"\n  {'-'*54}")
     print(f"  {'CSV DATABASE SUMMARY':^54}")
-    print(f"  {'─'*54}")
+    print(f"  {'-'*54}")
     print(f"  {'Total articles':<30} {total:>10}")
     print(f"  {'Published (any platform)':<30} {published:>10}")
     print(f"  {'Published on WordPress':<30} {on_wp:>10}")
     print(f"  {'Published on Blogger':<30} {on_blogger:>10}")
     print(f"  {'Published on Tumblr':<30} {on_tumblr:>10}")
-    print(f"  {'─'*54}")
+    print(f"  {'-'*54}")
 
     # Show last 5 rows
     print(f"\n  Last {min(5, total)} article(s):")
     for row in rows[-5:]:
-        platforms = row.get("platforms_published", "—") or "—"
-        print(f"    • {row.get('title','')[:45]:<45} [{platforms}]")
+        platforms = row.get("platforms_published", "-") or "-"
+        print(f"    - {row.get('title','')[:45]:<45} [{platforms}]")
     print()
 
 
@@ -378,12 +384,12 @@ def _opt_11_reset():
     _warn("This action CANNOT be undone.")
     print()
 
-    c1 = input("  First confirmation  — type  YES  to continue: ").strip()
+    c1 = input("  First confirmation  - type  YES  to continue: ").strip()
     if c1 != "YES":
         _info("Reset cancelled.")
         return
 
-    c2 = input("  Second confirmation — type  DELETE  to confirm: ").strip()
+    c2 = input("  Second confirmation - type  DELETE  to confirm: ").strip()
     if c2 != "DELETE":
         _info("Reset cancelled.")
         return
@@ -394,9 +400,9 @@ def _opt_11_reset():
     _ok("CSV has been reset to headers only. All article records deleted.")
 
 
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 #  MAIN LOOP
-# ══════════════════════════════════════════════════════════════
+# --------------------------------------------------------------
 
 def main():
     Config.ensure_directories()
@@ -408,7 +414,7 @@ def main():
         choice = input("  Enter your choice: ").strip()
 
         if choice == "0":
-            print("\n  Goodbye! 👋\n")
+            print("\n  Goodbye!\n")
             break
 
         elif choice == "1":
@@ -447,7 +453,7 @@ def main():
         else:
             _err("Invalid choice. Please enter a number from the menu.")
 
-        input("\n  Press Enter to return to the menu…")
+        input("\n  Press Enter to return to the menu...")
 
 
 if __name__ == "__main__":

@@ -311,36 +311,36 @@ logger = logging.getLogger(__name__)
 class ContentGeneratorAgent:
     def __init__(self, model_name: str = Config.MODEL_NAME):
         self.model_name = model_name
-        self.product_data = self._load_product_data()
+        self.product_data = self._load_service_data()
         # Title de-duplication manager
         self.title_manager = TitleManager(Config.USED_TITLES_CSV)
         # Slug collision-prevention registry — loads all used slugs from articles.csv at startup
         self.slug_registry = SlugRegistry(Config.CSV_PATH)
         self._product_rotation = []  # Current rotation of products
 
-    def _load_product_data(self) -> List[Dict]:
-        """Loads product data from the specified CSV file."""
+    def _load_service_data(self) -> List[Dict]:
+        """Loads service data from the specified CSV file."""
         if not os.path.exists(Config.PROJECT_DATA_CSV):
-            logger.warning("Product data CSV not found at %s. No product data available.", Config.PROJECT_DATA_CSV)
+            logger.warning("Service data CSV not found at %s. No service data available.", Config.PROJECT_DATA_CSV)
             return []
 
-        products = []
+        services = []
         try:
             if os.stat(Config.PROJECT_DATA_CSV).st_size == 0:
-                logger.warning("Product data CSV at %s is empty.", Config.PROJECT_DATA_CSV)
+                logger.warning("Service data CSV at %s is empty.", Config.PROJECT_DATA_CSV)
                 return []
 
             with open(Config.PROJECT_DATA_CSV, mode='r', encoding='utf-8') as infile:
                 reader = csv.DictReader(infile)
                 if not reader.fieldnames:
-                    logger.warning("Product CSV has no header/data.")
+                    logger.warning("Service CSV has no header/data.")
                     return []
                 for row in reader:
-                    products.append(dict(row))
-            logger.info("Successfully loaded %s products from %s.", len(products), Config.PROJECT_DATA_CSV)
-            return products
+                    services.append(dict(row))
+            logger.info("Successfully loaded %s services from %s.", len(services), Config.PROJECT_DATA_CSV)
+            return services
         except Exception as err:
-            logger.error("Failed to load product data from CSV: %s", err)
+            logger.error("Failed to load service data from CSV: %s", err)
             return []
 
     def _get_next_product(self, excluded_products: Optional[List[str]] = None) -> Optional[Dict]:
@@ -644,20 +644,38 @@ class ContentGeneratorAgent:
 
                     if len(unique_titles) >= num:
                         break
-
             except Exception as err:
                 logger.error("Error generating titles: %s", err)
 
             attempt += 1
 
+        if not unique_titles:
+            logger.warning("All LLM title attempts failed or were duplicates. Falling back to offline title generation.")
+            return self._generate_fallback_titles(num, category=category)
+
         return unique_titles[:num]
 
-    def _generate_fallback_titles(self, num: int) -> List[str]:
+    def _generate_fallback_titles(self, num: int, category: str = "") -> List[str]:
         """Generate fallback titles when LLM is not available."""
         titles = []
+        cat = category or Config.INDUSTRY_NAME or "Adventure"
+        city = Config.TARGET_CITY or "Rishikesh"
+        
+        templates = [
+            "Best {category} in {city} - Complete Guide",
+            "Top-Rated {category} in {city}: What You Need to Know",
+            "Why {city} is the Ultimate Destination for {category}",
+            "{category} in {city} - Safety, Prices, and Booking Tips",
+            "Exploring {category} in {city}: A Seasonal Guide"
+        ]
+        
         i = 0
-        while len(titles) < num and i < 100:  # Prevent infinite loop
-            title = f"{Config.INDUSTRY_NAME} Article {i+1} - {datetime.now().strftime('%Y%m%d')}"
+        while len(titles) < num and i < 100:
+            tmpl = templates[i % len(templates)]
+            # Add a bit of random uniqueness to avoid similarity collisions
+            suffix = datetime.now().strftime("%H%M%S") if i > 0 else datetime.now().strftime("%Y%m%d")
+            title = tmpl.format(category=cat, city=city) + f" ({suffix})"
+            
             if not self.title_manager.is_title_used(title):
                 titles.append(title)
                 self.title_manager.save_used_title(title)
@@ -1042,11 +1060,11 @@ Output the HTML-formatted version with perfect syntax."""
         template = Config.TEMPLATES.get("faq_item", "")
         if not template:
             # Absolute fallback if template is missing
-            return f'<div class="faq-section"><h2>FAQ</h2><p>Contact {Config.BRAND_NAME} for more details.</p></div>'
+            return f'<div class="faq-section"><h2>Frequently Asked Questions</h2><p>Contact {Config.BRAND_NAME} for more details.</p></div>'
 
         return f"""
         <div class="faq-section">
-        <h2>Frequently Asked Questions about {title}</h2>
+        <h2>Frequently Asked Questions</h2>
         {template.format(brand_name=Config.BRAND_NAME, title=title)}
         </div>
         """
@@ -1061,40 +1079,63 @@ Output the HTML-formatted version with perfect syntax."""
         slug = self._create_safe_slug(title)
         primary_keyword = keywords[0] if keywords else Config.INDUSTRY_NAME
         keyword_phrase = ", ".join(keywords[:6]) if keywords else Config.INDUSTRY_NAME
+        
+        # ── Category-aware context strings ────────────────────────────────────
+        category_lower = (category or "").lower()
+        activity_noun = (
+            "bungee jumping" if any(t in category_lower for t in ["bungee", "bungy"]) else
+            "river rafting" if any(t in category_lower for t in ["raft", "river"]) else
+            "paragliding" if "paragliding" in category_lower else
+            "zipline" if any(t in category_lower for t in ["zipline", "flying fox", "zip"]) else
+            "camping" if "camping" in category_lower else
+            "adventure sports"
+        )
         brand_context = (
-            f"{Config.BRAND_NAME} supports customers in {Config.TARGET_CITY} with practical "
-            f"{Config.INDUSTRY_NAME} guidance"
+            f"{Config.BRAND_NAME} makes it easy to book verified {activity_noun} experiences "
+            f"in {Config.TARGET_CITY} with transparent pricing and certified operators"
             if article_type == "brand"
-            else f"Professionals use {Config.INDUSTRY_NAME} planning to make better decisions"
+            else f"{Config.TARGET_CITY} is one of India's premier destinations for {activity_noun}, "
+                 f"attracting adventure travellers from across the country year-round"
         )
-        location_text = (
-            f"in {Config.TARGET_CITY}"
-            if article_type == "brand"
-            else "for modern teams"
-        )
+        location_text = f"in {Config.TARGET_CITY}"
 
         paragraph_templates = [
-            f"{brand_context}. This guide explains {primary_keyword} in clear language so readers can compare options, avoid common mistakes, and choose a practical next step.",
-            f"The topic matters because {primary_keyword} affects cost, durability, timelines, and day-to-day results. A strong article should connect the idea to real use cases instead of repeating generic claims.",
-            f"When evaluating {primary_keyword}, start with the goal, the expected workload, and the environment where the solution will be used. This keeps recommendations specific and useful.",
-            f"Teams should review materials, maintenance needs, installation constraints, service access, and long-term performance. Those details are often more important than short-term price alone.",
-            f"Good planning also means documenting requirements before comparing vendors or products. That gives readers a simple checklist and reduces the chance of mismatched expectations.",
-            f"For local projects {location_text}, timing and support quality matter. The best approach balances availability, technical fit, and reliable follow-through.",
-            f"Readers should look for clear specifications, transparent limitations, and examples that match their situation. That is how {primary_keyword} becomes a usable decision framework.",
-            f"A practical implementation plan includes budget, timeline, responsibilities, risk checks, and success metrics. These pieces make the advice easier to apply.",
-            f"Common mistakes include choosing based only on headline features, ignoring maintenance, skipping compatibility checks, and failing to confirm post-project support.",
-            f"The strongest results come from combining expert guidance with a realistic review of needs. That keeps {keyword_phrase} connected to outcomes readers actually care about.",
+            f"{brand_context}. This guide covers everything you need to know about {primary_keyword} \u2014 from pricing and safety to booking tips and what to expect on the day.",
+            f"{primary_keyword.title()} in {Config.TARGET_CITY} is available year-round, with the best conditions during September to November and March to May. Monsoon months (July\u2013August) may restrict certain outdoor activities due to high river levels and unpredictable weather.",
+            f"When planning {primary_keyword}, start by confirming the operator's safety certifications and reading recent independent customer reviews. Reputable operators in {Config.TARGET_CITY} follow international safety protocols and provide all necessary equipment.",
+            f"Prices for {primary_keyword} {location_text} vary depending on the package, duration, and whether professional video coverage is included. Booking through a verified platform ensures transparent pricing with no hidden fees.",
+            f"Safety standards for adventure activities in {Config.TARGET_CITY} have improved significantly in recent years. Look for operators who conduct mandatory pre-activity briefings, use load-tested equipment, and have trained first-aid staff on site.",
+            f"Advance booking is strongly recommended for {primary_keyword} {location_text}, especially during weekends and peak holiday seasons when slots fill up quickly. A 10% deposit secures your slot on most platforms.",
+            f"Participants should wear comfortable, athletic clothing and closed-toe shoes for {primary_keyword}. Remove loose jewellery and secure all valuables before the activity. All safety equipment is provided by the operator.",
+            f"Medical considerations matter before attempting {primary_keyword}. Individuals with heart conditions, recent injuries, epilepsy, or those who are pregnant should consult a doctor and disclose conditions to the operator before booking.",
+            f"Common mistakes when booking {primary_keyword} include choosing solely on price, skipping the safety briefing, and failing to confirm the cancellation policy. Taking a few minutes to verify these details makes the experience significantly safer.",
+            f"The strongest {primary_keyword} experiences come from choosing certified operators with proven track records. That means checking {keyword_phrase} \u2014 the factors that separate a memorable adventure from a frustrating one.",
         ]
-        if article_type == "brand":
-            paragraph_templates.extend([
-                f"Customers in {Config.TARGET_CITY} often need advice that reflects real timelines, service access, and product conditions. That local context keeps recommendations useful.",
-                f"Projects in {Config.TARGET_CITY} also benefit from experts in {Config.TARGET_CITY} who can explain tradeoffs clearly and support decisions after the first purchase.",
-                f"The best service in {Config.TARGET_CITY} combines dependable information with practical next steps, especially when readers are comparing {primary_keyword} options.",
-            ])
-        while len(" ".join(paragraph_templates).split()) < Config.MIN_WORD_COUNT:
-            paragraph_templates.append(
-                f"Another useful checkpoint for {primary_keyword} is to compare expected performance against real operating conditions. This helps readers filter weak options and focus on dependable choices."
-            )
+
+        # ── FIXED: Diverse supplement pool — never repeats a sentence ────────
+        # Old code had an infinite while-loop that appended THE SAME sentence
+        # 30+ times. This version draws from a shuffled pool without replacement.
+        supplement_pool = [
+            f"One important factor when evaluating {primary_keyword} is to verify the credentials and track record of the provider before committing.",
+            f"Setting a realistic budget range before comparing options prevents scope creep and ensures the decision aligns with long-term goals.",
+            f"Reading independent reviews from verified customers provides a clearer picture of {primary_keyword} than marketing materials alone.",
+            f"Timing matters — scheduling during off-peak periods often results in better availability and more personalised attention from operators.",
+            f"A written agreement outlining deliverables, timelines, and refund terms protects both parties and creates clear accountability.",
+            f"Comparing two or three shortlisted options against a defined criteria set leads to more confident, defensible decisions.",
+            f"Asking for references or case studies from providers in a similar context to your own helps validate claims made in sales conversations.",
+            f"Understanding the cancellation and modification policy before booking prevents unexpected losses if plans change at short notice.",
+            f"Post-experience feedback — whether formal surveys or informal conversations — helps providers improve and signals a commitment to quality.",
+            f"The long-term value of {primary_keyword} often depends more on ongoing support quality than on initial pricing or headline features.",
+        ]
+        # Shuffle and draw only what is needed — hard cap prevents any repetition
+        current_words = len(" ".join(paragraph_templates).split())
+        fallback_target = min(Config.MIN_WORD_COUNT, 900)
+        random.shuffle(supplement_pool)
+        for extra in supplement_pool:
+            if current_words >= fallback_target:
+                break
+            paragraph_templates.append(extra)
+            current_words += len(extra.split())
 
         html_parts = [
             f"<h1>{title}</h1>",
@@ -1104,12 +1145,14 @@ Output the HTML-formatted version with perfect syntax."""
             if idx == 3:
                 html_parts.append(f"<h2>How To Evaluate {primary_keyword.title()}</h2>")
             if idx == 6:
-                html_parts.append(f"<h3>Practical Selection Checklist</h3>")
+                html_parts.append(f"<h3>Practical Booking and Selection Checklist</h3>")
                 html_parts.append(
                     "<ul>"
-                    f"<li>Confirm the exact use case for <strong>{primary_keyword}</strong>.</li>"
-                    "<li>Review compatibility, support, and maintenance needs.</li>"
-                    "<li>Compare long-term value instead of only upfront cost.</li>"
+                    f"<li>Confirm the exact use case and requirements for <strong>{primary_keyword}</strong>.</li>"
+                    "<li>Verify safety certifications and read recent customer reviews.</li>"
+                    "<li>Compare long-term value rather than only upfront cost.</li>"
+                    "<li>Check the cancellation and refund policy before paying any deposit.</li>"
+                    "<li>Book in advance during peak season to secure preferred slots.</li>"
                     "</ul>"
                 )
             if idx == 8:
@@ -1120,22 +1163,26 @@ Output the HTML-formatted version with perfect syntax."""
         html_content = "".join(html_parts)
         word_count = len(re.findall(r'\b\w+\b', self._extract_text_from_html(html_content)))
         meta_description = (
-            f"Learn how to evaluate {primary_keyword} with practical guidance for planning, "
-            "selection, maintenance, and long-term value."
+            f"Plan your {primary_keyword} experience in {Config.TARGET_CITY} with confidence. "
+            f"Covers pricing, safety standards, booking tips, and what to expect."
         )
         meta_title = title
         if primary_keyword.lower() not in meta_title.lower():
-            meta_title = f"{primary_keyword.title()} Guide for Better Planning"
+            meta_title = f"{primary_keyword.title()} Guide — {Config.TARGET_CITY}"
         if len(meta_title) < 40:
-            meta_title = f"{meta_title} For Better Decisions"
+            meta_title = f"{meta_title} — Complete Visitor Guide"
         faq_section = (
-            f'<div class="faq-section"><h2>Frequently Asked Questions about {title}</h2>'
-            f'<h3>What should readers check first?</h3>'
-            f'<p>Readers should start by defining the goal, expected use case, and success criteria for {primary_keyword}.</p>'
-            f'<h3>How can readers compare options?</h3>'
-            f'<p>They should compare long-term value, support needs, maintenance requirements, and practical fit.</p>'
-            f'<h3>What mistakes should readers avoid?</h3>'
-            f'<p>They should avoid choosing only on price, ignoring compatibility, and skipping implementation planning.</p>'
+            f'<div class="faq-section"><h2>Frequently Asked Questions — {primary_keyword.title()} in {Config.TARGET_CITY}</h2>'
+            f'<h3>What should I check before booking {primary_keyword} in {Config.TARGET_CITY}?</h3>'
+            f'<p>Verify the operator has valid safety certifications, check recent customer reviews on independent platforms, and confirm the cancellation policy before paying any deposit.</p>'
+            f'<h3>What is the best time to experience {primary_keyword} in {Config.TARGET_CITY}?</h3>'
+            f'<p>September to November and March to May offer the best weather and conditions for adventure activities in {Config.TARGET_CITY}. Monsoon season (July–August) may limit certain outdoor activities.</p>'
+            f'<h3>How do I book {primary_keyword} through {Config.BRAND_NAME}?</h3>'
+            f'<p>{Config.BRAND_NAME} allows online booking with only a 10% advance deposit. The remaining balance is paid directly at the venue on the day of your activity. Free DSLR video is included with select packages.</p>'
+            f'<h3>Is {primary_keyword} safe for first-time visitors to {Config.TARGET_CITY}?</h3>'
+            f'<p>Yes, when booked through certified operators. Always attend the mandatory pre-activity safety briefing, follow all instructor guidance, and disclose any relevant medical conditions before the activity.</p>'
+            f'<h3>What should I wear and carry for {primary_keyword} in {Config.TARGET_CITY}?</h3>'
+            f'<p>Wear comfortable, athletic clothing and closed-toe shoes. Remove loose jewellery and secure valuables. All safety equipment — harnesses, helmets, life jackets as applicable — is provided by the operator.</p>'
             '</div>'
         )
         metadata = Metadata(
