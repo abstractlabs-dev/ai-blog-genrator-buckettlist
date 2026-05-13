@@ -1,0 +1,76 @@
+{
+  "top_tourist_places": [
+    {
+      "name": "Laxman Jhula & Ram Jhula",
+      "description": "Iconic suspension bridges over the Ganges, connecting major temples and ashrams.",
+      "activities": ["Photography", "Sightseeing", "Visiting Temples"]
+    },
+    {
+      "name": "Triveni Ghat",
+      "description": "The most sacred bathing ghat in Rishikesh, famous for the evening Ganga Aarti.",
+      "activities": ["Ganga Aarti", "Holy Dip", "Meditation"]
+    },
+    {
+      "name": "Parmarth Niketan",
+      "description": "One of the largest ashrams in Rishikesh, known for its spiritual atmosphere and yoga classes.",
+      "activities": ["Yoga", "Meditation", "Evening Prayer"]
+    },
+    {
+      "name": "The Beatles Ashram (Chaurasi Kutia)",
+      "description": "The ruins of the ashram where The Beatles stayed in 1968, now a serene forest reserve with graffiti art.",
+      "activities": ["Nature Walk", "Photography", "Meditation"]
+    },
+    {
+      "name": "Shivpuri",
+      "description": "The hub of adventure in Rishikesh, located 19km from the town.",
+      "activities": ["River Rafting", "Camping", "Trekking"]
+    },
+    {
+      "name": "Neer Garh Waterfall",
+      "description": "A series of three beautiful waterfalls accessible via a short hike.",
+      "activities": ["Hiking", "Photography", "Nature Picnic"]
+    },
+    {
+      "name": "Neelkanth Mahadev Temple",
+      "description": "Ancient temple dedicated to Lord Shiva, situated at 1330m height with panoramic valley views.",
+      "activities": ["Trekking", "Pilgrimage", "Sightseeing"]
+    }
+  ],
+  "underrated_hidden_gems": [
+    {
+      "name": "Patna Waterfall",
+      "description": "A secluded waterfall reached through a dense forest trek, offering peace and untouched nature.",
+      "type": "Nature"
+    },
+    {
+      "name": "Vashishta Gufa (Cave)",
+      "description": "An ancient cave on the banks of the Ganges where sage Vashishta meditated for years.",
+      "type": "Spiritual/Silent"
+    },
+    {
+      "name": "Garud Chatti Waterfall",
+      "description": "A hidden gem near the Neelkanth temple road, perfect for those seeking solitude.",
+      "type": "Nature"
+    },
+    {
+      "name": "Phool Chatti Ashram Area",
+      "description": "A quiet stretch of riverbanks and trails away from the main city's bustle.",
+      "type": "Spiritual/Relaxation"
+    },
+    {
+      "name": "Rishikund",
+      "description": "A sacred ancient pond near Raghunath Temple, known for its reflection of the Shani temple.",
+      "type": "History/Spiritual"
+    },
+    {
+      "name": "Jhilmil Gufa",
+      "description": "A group of three caves in the forest near Neelkanth temple, used for deep meditation.",
+      "type": "Spiritual"
+    },
+    {
+      "name": "Goa Beach",
+      "description": "A quiet white-sand beach on the Ganges near Laxman Jhula, popular among backpackers.",
+      "type": "Relaxation"
+    }
+  ]
+}

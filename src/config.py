@@ -168,6 +168,9 @@ class Config:
 
     # Expose as Class Attributes - Prioritize .env if available
     # Keywords
+    # Load ALL keywords from keywords.json for deep-topic targeting
+    KEYWORDS_ALL = _keywords_cfg
+    
     PRIMARY_KEYWORDS = (
         os.getenv("PRIMARY_KEYWORDS", "").split(",")
         if os.getenv("PRIMARY_KEYWORDS")
@@ -194,6 +197,10 @@ class Config:
     CURATED_KEYWORDS = [k.strip() for k in CURATED_KEYWORDS if k.strip()]
     LOCATION_KEYWORDS = [k.strip() for k in LOCATION_KEYWORDS if k.strip()]
     FORBIDDEN_KEYWORDS = [k.strip() for k in FORBIDDEN_KEYWORDS if k.strip()]
+
+    # Places Data
+    PLACES_PATH = os.path.join(CONFIG_DIR, "places.json")
+    PLACES_DATA = _load_json_config.__func__(PLACES_PATH, {"top_tourist_places": [], "underrated_hidden_gems": []})
 
     # Scraper Targets & Blacklist (Override with JSON strings in .env if needed)
     SCRAPER_TARGETS = _get_env_json.__func__("SCRAPER_TARGETS", _competitors_cfg.get("scraper_targets", {}))

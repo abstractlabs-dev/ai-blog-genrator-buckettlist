@@ -203,51 +203,87 @@ class BlogGeneratorOrchestrator:
             return articles_data
 
     def _extract_keywords_from_scraped_titles(self, num_keywords: int = 15, category: Optional[str] = None) -> list:
-        """Load keywords directly from the scraped keywords CSV.
+        """Load keywords from both scraped data and the rich keywords.json configuration.
 
-        This method does not mine keywords from titles; it only uses keywords that
-        were explicitly scraped from pages by the RobustScraper.
+        This method combines keywords explicitly scraped from pages with high-intent
+        keywords from the project's master keywords.json file based on the category.
         """
         try:
             keyword_list: list[str] = []
 
+            # 1. Load from keywords.json (Priority)
+            if hasattr(Config, "KEYWORDS_ALL") and Config.KEYWORDS_ALL:
+                # Try to find a matching cluster in keywords.json
+                cat_key = (category or "").lower().replace(" ", "_")
+                # Handle common aliases/mappings
+                mappings = {
+                    "travel_tips": "spiritual_cultural",
+                    "trekking": "trekking_hiking",
+                    "hiking": "trekking_hiking",
+                    "rafting": "river_rafting",
+                    "bungee": "bungee_jumping"
+                }
+                mapped_key = mappings.get(cat_key, cat_key)
+                
+                cluster = Config.KEYWORDS_ALL.get(mapped_key)
+                if cluster:
+                    logger.info("Found keyword cluster for category: %s (mapped to %s)", category, mapped_key)
+                    if isinstance(cluster, dict):
+                        # Combine head terms, informational, and transactional keywords
+                        keyword_list.extend(cluster.get("head_terms", []))
+                        keyword_list.extend(cluster.get("informational", []))
+                        keyword_list.extend(cluster.get("transactional", []))
+                        # If it has a generic 'keywords' list
+                        keyword_list.extend(cluster.get("keywords", []))
+                    elif isinstance(cluster, list):
+                        keyword_list.extend(cluster)
+
+            # 2. Load from scraped_articles.json (Discovery)
             if os.path.exists(Config.SCRAPED_ARTICLES_JSON):
-                logger.info("Reading scraped articles from %s", Config.SCRAPED_ARTICLES_JSON)
                 with open(Config.SCRAPED_ARTICLES_JSON, 'r', encoding='utf-8') as file:
                     data = json.load(file)
 
-                # Expected structure per entry:
-                # {"title": "...", "keywords": ["kw1", "kw2", ...]}
                 for obj in data:
                     kws = obj.get("keywords") or []
                     if isinstance(kws, str):
-                        # Backwards compatibility: split comma-separated strings
                         parts = [p.strip() for p in kws.split(",")]
                     else:
                         parts = [p.strip() for p in kws if isinstance(p, str)]
                     for part in parts:
                         if part:
                             keyword_list.append(part)
-            else:
-                logger.warning(
-                    "Scraped articles JSON not found at %s. Using fallback keywords.",
-                    Config.SCRAPED_ARTICLES_JSON
-                )
 
-            # Context-aware mandatory keywords
+            # 3. Add mandatory/branded keywords
             if category:
-                # If we have a specific category, center keywords around it
-                mandatory_keywords = [
-                    category.lower(),
-                    f"{category.lower()} in {Config.TARGET_CITY.lower()}",
-                    f"best {category.lower()}",
-                    f"{category.lower()} services",
-                    Config.BRAND_NAME.lower()
-                ]
-            else:
-                # Fallback to generic keywords only if no category is specified
-                mandatory_keywords = [
-                    Config.TARGET_CITY.lower(), "industry", f"experts in {Config.TARGET_CITY.lower()}",
+                keyword_list.insert(0, category.lower())
+                keyword_list.insert(1, f"{category.lower()} in {Config.TARGET_CITY.lower()}")
+                keyword_list.insert(2, f"best {category.lower()} in rishikesh")
+            
+            keyword_list.append(Config.BRAND_NAME.lower())
+            keyword_list.append("bucketlistt")
+
+            # Remove duplicates and limit
+            seen = set()
+            unique_kws = []
+            for kw in keyword_list:
+                kw_low = kw.lower().strip()
+                if kw_low and kw_low not in seen:
+                    seen.add(kw_low)
+                    unique_kws.append(kw)
+            
+            # Shuffle the middle part for variety, keep mandatory ones at start
+            mandatory_count = 3 if category else 0
+            mandatory = unique_kws[:mandatory_count]
+            rest = unique_kws[mandatory_count:]
+            random.shuffle(rest)
+            
+            final_keywords = (mandatory + rest)[:num_keywords]
+            
+            if not final_keywords:
+                logger.warning("No keywords found. Using fallback.")
+                return ["adventure sports", "rishikesh tourism", "things to do in rishikesh"]
+                
+            return final_keywords
                     "latest trends", Config.BRAND_NAME.lower(), "professional services"
                 ]
 
@@ -678,10 +714,13 @@ class BlogGeneratorOrchestrator:
 
         if blog_ctx["best"]["article"] and blog_ctx["best"]["report"]:
             if not blog_ctx["best"]["report"].passed:
-                logger.warning(
-                    "Article did not meet SEO threshold (score: %s%% < %s%%). Saving best version anyway.",
-                    blog_ctx["best"]["report"].overall_score, Config.SEO_THRESHOLD
+                error_msg = (
+                    f"Article REJECTED: Did not meet SEO threshold of {Config.SEO_THRESHOLD}% "
+                    f"(Best Score: {blog_ctx['best']['report'].overall_score}%). "
+                    "This article will not be saved or published."
                 )
+                logger.error(error_msg)
+                raise BlogGenerationError(error_msg)
             else:
                 logger.info(
                     "Successfully generated article with score %s and word count %s.",

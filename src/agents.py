@@ -758,7 +758,22 @@ class ContentGeneratorAgent:
             )
 
         # Combine contexts
-        final_context = product_context if product_context else project_context
+        places_context = ""
+        if hasattr(Config, "PLACES_DATA") and Config.PLACES_DATA:
+            top_places = Config.PLACES_DATA.get("top_tourist_places", [])
+            gems = Config.PLACES_DATA.get("underrated_hidden_gems", [])
+            
+            if top_places:
+                places_context += "\n**MUST MENTION SOME OF THESE TOP PLACES:**\n"
+                for p in random.sample(top_places, min(len(top_places), 3)):
+                    places_context += f"- {p['name']}: {p['description']}\n"
+            
+            if gems:
+                places_context += "\n**MUST MENTION SOME OF THESE UNDERRATED GEMS:**\n"
+                for g in random.sample(gems, min(len(gems), 2)):
+                    places_context += f"- {g['name']}: {g['description']}\n"
+
+        final_context = (product_context if product_context else project_context) + places_context
 
         # Generate the content using the appropriate prompt
         prompt = create_content_prompt(
