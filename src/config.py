@@ -201,6 +201,10 @@ class Config:
     # Places Data
     PLACES_PATH = os.path.join(CONFIG_DIR, "places.json")
     PLACES_DATA = _load_json_config.__func__(PLACES_PATH, {"top_tourist_places": [], "underrated_hidden_gems": []})
+    
+    # Detailed Places Information (New Researcher Data)
+    PLACES_DETAILS_PATH = os.path.join(CONFIG_DIR, "rishikesh_places_details.json")
+    PLACES_DETAILS_DATA = _load_json_config.__func__(PLACES_DETAILS_PATH, {"locations": [], "rafting_routes": [], "travel_tips_2026": {}})
 
     # Scraper Targets & Blacklist (Override with JSON strings in .env if needed)
     SCRAPER_TARGETS = _get_env_json.__func__("SCRAPER_TARGETS", _competitors_cfg.get("scraper_targets", {}))
@@ -220,10 +224,10 @@ class Config:
     IMAGE_GENERATION_RATIO = float(os.getenv("IMAGE_GENERATION_RATIO", "1.0"))
 
     # SEO Configuration
-    MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "1200"))
+    MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "1000"))
     MAX_WORD_COUNT = int(os.getenv("MAX_WORD_COUNT", "2000"))
     SEO_THRESHOLD = int(os.getenv("SEO_THRESHOLD", "80"))
-    MAX_ITERATIONS = int(os.getenv("MAX_ARTICLE_RETRIES", "5"))
+    MAX_ITERATIONS = int(os.getenv("MAX_ARTICLE_RETRIES", "3"))
     MAX_TOTAL_ARTICLES = int(os.getenv("MAX_TOTAL_ARTICLES", "5000"))
 
     # Fallback lists are now handled via default .env values or JSON files.

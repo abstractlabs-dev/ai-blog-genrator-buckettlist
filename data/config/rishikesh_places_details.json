@@ -1,0 +1,106 @@
+{
+  "last_updated": "2026-05-13",
+  "locations": [
+    {
+      "name": "Bajrang Setu (Glass Floor Bridge)",
+      "famous_for": "India's first glass-floor suspension bridge; replacement for the historic Laxman Jhula.",
+      "details": "Spans 132 meters with 1.5-meter-wide reinforced glass walkways on both sides.",
+      "things_to_do": ["Walking across the glass panels", "Viewing the Ganga below", "Photography"],
+      "how_to_reach": "Located near the original Laxman Jhula site. Walkable from Tapovan or accessible by auto-rickshaw.",
+      "best_time": "September to June (Evening for lights)",
+      "fee": "Free (Public access)",
+      "status_2026": "Operational (occasionally closed for minor maintenance; check locally)."
+    },
+    {
+      "name": "Lakshman Jhula & Ram Jhula",
+      "famous_for": "Iconic iron suspension bridges; spiritual and cultural landmarks.",
+      "things_to_do": ["Photography", "Market exploration", "Visit Tera Manzil Temple"],
+      "how_to_reach": "Accessible by walking, motorbike, or shared auto-rickshaws.",
+      "status_2026": "Lakshman Jhula restricted for safety; pedestrian traffic encouraged on Bajrang Setu or Ram Jhula."
+    },
+    {
+      "name": "Triveni Ghat",
+      "famous_for": "Sacred bathing spot and the most powerful evening Maha Ganga Aarti.",
+      "things_to_do": ["Attend Maha Ganga Aarti", "Holy dip", "Visit Raghunath Temple"],
+      "timings_2026": "Summer: 6:00 PM - 7:00 PM | Winter: 5:30 PM - 6:30 PM",
+      "fee": "Free",
+      "tips": "Arrive 45 mins early for seating."
+    },
+    {
+      "name": "The Beatles Ashram (Chaurasi Kutia)",
+      "famous_for": "Ruins where The Beatles learned Transcendental Meditation in 1968.",
+      "things_to_do": ["Graffiti art tour", "Explore meditation domes", "Photography"],
+      "fee_2026": "₹200 (Indians), ₹1200 (Foreigners), ₹100 (Seniors/Students)",
+      "timings_2026": "Summer: 10:00 AM - 4:30 PM | Winter: 10:00 AM - 3:30 PM"
+    },
+    {
+      "name": "Kunjapuri Devi Temple",
+      "famous_for": "Panoramic Himalayan sunrise views from 1676m altitude.",
+      "things_to_do": ["Sunrise viewing", "Temple pilgrimage", "Downhill trek to Neer Garh (8-9 km)"],
+      "how_to_reach": "25-30 km from Rishikesh; depart at 4:00 AM by taxi for sunrise.",
+      "fees_2026": "Temple entry free; guided sunrise tours ₹2500 - ₹4000."
+    },
+    {
+      "name": "Jumpin Heights (Mohan Chatti)",
+      "famous_for": "India's premier bungee jumping destination (83 meters).",
+      "things_to_do": ["Bungee Jump", "Giant Swing", "Flying Fox (1km)"],
+      "fees_2026": "Bungee/Swing: ~₹4500 | Flying Fox: ~₹2500 | Combos: ₹7000 - ₹9000",
+      "requirements": "Age 12+; Weight 35kg - 110kg; Closed Tuesdays."
+    },
+    {
+      "name": "Neer Garh & Garud Chatti Waterfalls",
+      "famous_for": "Multi-tiered natural waterfalls and secluded jungle pools.",
+      "trek_difficulty": "Neer Garh: Easy-Moderate (1.5 km hike) | Garud Chatti: Secluded/Quiet",
+      "fee_2026": "₹50 - ₹100 entry fee",
+      "best_time": "Post-monsoon (October - November) for full flow."
+    },
+    {
+      "name": "Vashishta Gufa (Cave)",
+      "famous_for": "Ancient meditation cave of Sage Vashishta; sanctuary of silence.",
+      "timings_2026": "8:00 AM - 12:00 PM and 3:00 PM - 6:00 PM",
+      "fee": "Free",
+      "rules": "Strict silence mandatory inside."
+    },
+    {
+      "name": "Rajaji National Park (Chilla Zone)",
+      "famous_for": "Wildlife safaris; spotting elephants, leopards, and diverse birds.",
+      "season_2026": "Open 15th November to 15th June",
+      "fees_2026": "Entry: ₹150 (Indian) / ₹600 (Foreigner) | Jeep Safari: ₹3500 - ₹4500",
+      "timings": "Morning: 7:00 AM - 10:00 AM | Afternoon: 2:30 PM - 5:30 PM"
+    }
+  ],
+  "rafting_routes_2026": [
+    {
+      "name": "Brahmpuri to Rishikesh",
+      "distance": "9 km",
+      "grade": "I & II (Easy)",
+      "age_limit": "14 - 60 years",
+      "best_for": "Families and first-timers"
+    },
+    {
+      "name": "Shivpuri to Rishikesh",
+      "distance": "16 km",
+      "grade": "II & III (Moderate)",
+      "popular_rapids": "Roller Coaster, Golf Course",
+      "best_for": "Most popular choice for thrill-seekers"
+    },
+    {
+      "name": "Marine Drive to Rishikesh",
+      "distance": "26 km",
+      "grade": "III (Challenging)",
+      "rapids": "Three Blind Mice, Crossfire",
+      "duration": "4 - 5 hours"
+    },
+    {
+      "name": "Kaudiyala to Rishikesh",
+      "distance": "36 km",
+      "grade": "III - IV+ (Advanced)",
+      "key_rapid": "The Wall (High risk/High reward)",
+      "experience": "Recommended for experienced rafters only"
+    }
+  ],
+  "local_secrets_2026": {
+    "cafes": ["Little Buddha (River views)", "Secret Garden (Organic)", "Café Prakriti (Vegan)"],
+    "offbeat": ["Phool Chatti (Peaceful ashrams)", "Patna Waterfall (Forest trek)", "Goa Beach (White sand)"]
+  }
+}

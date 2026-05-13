@@ -441,10 +441,10 @@ def create_content_prompt(
     - **FOCUS_KEYWORD:** The primary keyword for the article (1-3 words).
     
     **CONTENT REQUIREMENTS:**
-    - **Word Count:** MANDATORY 1300-1800 words. Articles under 1250 main-body words are UNACCEPTABLE. Expand every section with extreme depth and professional expertise.
+    - **Word Count:** MANDATORY minimum 1100 words. Expand every section with extreme depth and professional expertise.
     - **SEO Score Target:** Achieve 100/100 optimization.
-    - **Keyword Density:** Maintain a natural density of 2.0% to 5.0% for the provided keywords. Mention each keyword at least 2-3 times in the content. Avoid repetitive sentences.
-    - **Factual Accuracy:** Ensure all information is accurate and up-to-date.
+    - **Keyword Density:** Maintain a strict density of 2.5% to 5.0% for the provided keywords. Mention each keyword at least 3-5 times in the content. Avoid repetitive sentences.
+    - **Factual Accuracy:** Ensure all information is accurate and up-to-date (2026 data).
     {brand_specific_content if is_brand_article else industry_specific_content}
     """
     
@@ -735,7 +735,7 @@ def create_content_prompt(
     | :--- | :--- |
     | **Keyword Usage** | Use keywords naturally. If a keyword conflicts with category, use it in a comparison. |
     | **Keyword Density** | Overall primary keyword density must be between 2.0% - 6.0%. |
-    | **Word Count** | MINIMUM 1300 words. (Expand on details, provide examples, explain 'why' and 'how'). |
+    | **Word Count** | MINIMUM 1100 words. (Expand on details, provide examples, explain 'why' and 'how'). |
     | **Title SEO** | Title MUST include at least one Primary Keyword. |
     | **Location Density** | Mention '{Config.TARGET_CITY}' naturally at least 5-8 times. |
     | **Location Booster** | Use phrases like "best solutions in {Config.TARGET_CITY}" or "experts in {Config.TARGET_CITY}" 3+ times. |
@@ -817,7 +817,7 @@ def create_content_prompt(
        - "- bullet point" → REJECTED (use <li>)
     
     ❌ OTHER FAILURES:
-       - Less than 1300 words → REJECTED
+       - Less than 1100 words → REJECTED
        - Any language other than English → REJECTED
        - Missing Primary Keywords (< 3 mentions each) → REJECTED
        - (Brand Only) Missing '{Config.TARGET_CITY}' (< 8 mentions) → REJECTED

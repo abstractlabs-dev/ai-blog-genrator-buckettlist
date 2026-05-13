@@ -759,6 +759,7 @@ class ContentGeneratorAgent:
 
         # Combine contexts
         places_context = ""
+        # 1. Inject specific places from places.json (Legacy)
         if hasattr(Config, "PLACES_DATA") and Config.PLACES_DATA:
             top_places = Config.PLACES_DATA.get("top_tourist_places", [])
             gems = Config.PLACES_DATA.get("underrated_hidden_gems", [])
@@ -772,6 +773,48 @@ class ContentGeneratorAgent:
                 places_context += "\n**MUST MENTION SOME OF THESE UNDERRATED GEMS:**\n"
                 for g in random.sample(gems, min(len(gems), 2)):
                     places_context += f"- {g['name']}: {g['description']}\n"
+
+        # 2. Deep Search Injection (New Researcher Data)
+        # We trigger this if the title or category suggests a 'tourist guide' or 'places to visit' intent
+        tourist_triggers = ["places to visit", "things to do", "tourist guide", "sightseeing", "itinerary", "rafting", "camping"]
+        normalized_title = title.lower()
+        is_tourist_guide = any(trigger in normalized_title for trigger in tourist_triggers) or \
+                           (category and any(trigger in category.lower() for trigger in tourist_triggers))
+
+        if is_tourist_guide and hasattr(Config, "PLACES_DETAILS_DATA") and Config.PLACES_DETAILS_DATA:
+            logger.info("Tourist/Place intent detected. Injecting deep-research details into context.")
+            deep_context = "\n\n**DETAILED RESEARCH DATA (USE THESE SPECIFIC DETAILS):**\n"
+            
+            # Add locations
+            locations = Config.PLACES_DETAILS_DATA.get("locations", [])
+            if locations:
+                deep_context += "\n### Key Locations Details:\n"
+                # Pick 4 relevant locations for depth
+                selected_locs = random.sample(locations, min(len(locations), 5))
+                for loc in selected_locs:
+                    loc_name = loc.get('name', 'N/A')
+                    famous = loc.get('famous_for', 'N/A')
+                    activities = ", ".join(loc.get('things_to_do', [])) if isinstance(loc.get('things_to_do'), list) else "N/A"
+                    reach = loc.get('how_to_reach', 'N/A')
+                    timings = loc.get('timings_2026') or loc.get('timings') or "N/A"
+                    fee = loc.get('fees_2026') or loc.get('fee') or "N/A"
+                    tip = loc.get('tips', 'N/A')
+                    deep_context += f"- **{loc_name}**: Famous for {famous}. Activities: {activities}. How to reach: {reach}. Timings/Fee: {timings} / {fee}. Tip: {tip}\n"
+
+            # Add rafting routes if relevant
+            if "rafting" in normalized_title or "adventure" in normalized_title:
+                rafting = Config.PLACES_DETAILS_DATA.get("rafting_routes", [])
+                if rafting:
+                    deep_context += "\n### River Rafting Route Options:\n"
+                    for route in rafting:
+                        deep_context += f"- {route['name']}: {route['distance']}, Grade {route['grade']}. Best for: {route['best_for']}. Key Rapids: {route['rapids']}.\n"
+
+            # Add travel tips
+            tips = Config.PLACES_DETAILS_DATA.get("travel_tips_2026", {})
+            if tips:
+                deep_context += f"\n### 2026 Travel Logistics:\n- Nearest Airport: {tips.get('nearest_airport')}\n- Best Season: {tips.get('best_season')}\n- Dress Code: {tips.get('dress_code')}\n"
+
+            places_context += deep_context
 
         final_context = (product_context if product_context else project_context) + places_context
 
@@ -794,125 +837,32 @@ class ContentGeneratorAgent:
             return fallback_article, product
 
         try:
-            # ========== STEP 1: GENERATE RAW CONTENT (with env temperature) ==========
-            logger.info("Step 1/2: Generating raw article content with temperature=%.2f", temperature)
+            # ========== SINGLE-PASS GENERATION (Optimized) ==========
+            logger.info("Generating article in a single pass with temperature=%.2f", temperature)
 
-            # Modify prompt to output plain text instead of HTML
-            plain_text_prompt = prompt.replace(
-                "Write this article as if you are coding a production-ready HTML page",
-                "Write this article in plain text format"
-            ).replace(
-                "**STRICT HTML SYNTAX:**",
-                "**PLAIN TEXT FORMAT:**"
-            ).replace(
-                "All HTML tags MUST be perfectly formatted",
-                "Use simple text formatting without HTML tags"
-            ).replace(
-                "<h1>", "ARTICLE_TITLE: "
-            ).replace(
-                "<h2>", "SECTION: "
-            ).replace(
-                "<h3>", "SUBSECTION: "
-            ).replace(
-                "<p>", ""
-            ).replace(
-                "</p>", ""
-            ).replace(
-                "<b>", ""
-            ).replace(
-                "</b>", ""
-            ).replace(
-                "<strong>", ""
-            ).replace(
-                "</strong>", ""
-            ).replace(
-                "ABSOLUTE STRICT HTML FORMAT", "PLAIN TEXT FORMAT"
-            )
-
-            # Add instruction to output plain text
-            plain_text_instruction = """
-            
-OUTPUT IN PLAIN TEXT FORMAT:
-- Use "SECTION:" for main headings
-- Use "SUBSECTION:" for subheadings  
-- Use "LIST:" followed by bullet points with "-"
-- Write paragraphs as plain text
-- Do NOT use any HTML tags
-- Keep all metadata (META_TITLE, META_DESCRIPTION, etc.) as before
-"""
-            plain_text_prompt = plain_text_prompt + plain_text_instruction
-
-            raw_content, usage_step1 = call_llm(
+            article_response, usage = call_llm(
                 self.model_name,
-                plain_text_prompt,
-                max_tokens=4000,
+                prompt,
+                max_tokens=4500,
                 temperature=temperature,  # From .env
                 presence_penalty=presence_penalty if presence_penalty is not None else Config.PRESENCE_PENALTY,
                 frequency_penalty=frequency_penalty if frequency_penalty is not None else Config.FREQUENCY_PENALTY,
-                include_usage=True
-            )
-
-            # ========== STEP 2: CONVERT TO HTML (with fixed 0.05 temperature) ==========
-            logger.info("Step 2/2: Converting plain text to HTML with temperature=0.05 (fixed)")
-
-            # Create HTML conversion prompt
-            html_conversion_prompt = (
-                f"""You are an expert HTML converter. """
-                f"""Convert the following plain text article into properly formatted HTML.
-
-CONVERSION RULES:
-1. Convert "ARTICLE_TITLE:" to <h1>TITLE</h1>
-2. Convert "SECTION:" to <h2>SECTION_NAME</h2>
-3. Convert "SUBSECTION:" to <h3>SUBSECTION_NAME</h3>
-4. Convert plain paragraphs to <p>PARAGRAPH</p>
-5. Convert "LIST:" sections to <ul> with <li> items
-6. Add <b> or <strong> tags to emphasize 1-5 important words per paragraph
-7. Keep META_TITLE, META_DESCRIPTION, URL_SLUG, FOCUS_KEYWORD exactly as provided
-8. Ensure ALL tags are properly closed with NO spaces: <b>text</b> NOT < b>text< /b>
-9. Do NOT modify the content, only convert structure to HTML
-
-CRITICAL HTML SYNTAX RULES:
-- Every opening tag must have a closing tag
-- NO spaces inside tags: <h2> NOT < h2> or <h2 >
-- Bold only SHORT phrases (1-5 words), never full sentences
-- Use only <h1>, <h2>, <h3> tags (NO h4, h5, h6)
-- Every <b> must have </b>, every <p> must have </p>
-
-Plain text article to convert:
-{raw_content}
-
-Output the HTML-formatted version with perfect syntax."""
-            )
-
-            formatted_content, usage_step2 = call_llm(
-                self.model_name,
-                html_conversion_prompt,
-                max_tokens=4500,
-                temperature=0.05,  # FIXED at 0.05 (not from .env)
-                include_usage=True
-                # NO presence_penalty or frequency_penalty for this call
+                include_usage=True,
+                task_name=f"Article Gen: {title[:30]}"
             )
 
             # Parse the final formatted content (pass category for slug generation)
-            article_draft = self._parse_article_response(formatted_content, title, target_keywords, category=category)
+            article_draft = self._parse_article_response(article_response, title, target_keywords, category=category)
             article_draft.category = str(category).strip() if category else ""
 
-            # Combine usage stats from both steps
-            combined_usage = {
-                'prompt_tokens': usage_step1.get('prompt_tokens', 0) + usage_step2.get('prompt_tokens', 0),
-                'completion_tokens': usage_step1.get('completion_tokens', 0) + usage_step2.get('completion_tokens', 0),
-                'total_tokens': usage_step1.get('total_tokens', 0) + usage_step2.get('total_tokens', 0),
-                'cost': usage_step1.get('cost', 0.0) + usage_step2.get('cost', 0.0)
-            }
-
-            article_draft.token_usage = combined_usage
-            article_draft.cost = combined_usage.get('cost', 0.0)
+            # Assign usage stats
+            article_draft.token_usage = usage
+            article_draft.cost = usage.get('cost', 0.0)
 
             logger.info(
-                "Two-step generation complete. Total cost: $%.4f (Step1: $%.4f + Step2: $%.4f)",
-                combined_usage['cost'],
-                usage_step1.get('cost', 0.0),
-                usage_step2.get('cost', 0.0)
+                "Single-pass generation complete. Cost: $%.4f | Tokens: %d",
+                article_draft.cost,
+                usage.get('total_tokens', 0)
             )
 
             return article_draft, product
@@ -1224,12 +1174,12 @@ Output the HTML-formatted version with perfect syntax."""
 class SEOEvaluatorAgent:
     def __init__(self):
         self.scoring_weights = {
-            'title_meta_optimization': 20,
+            'title_meta_optimization': 15,
             'keyword_integration': 20,
             'location_keyword_usage': 20,
             'heading_structure': 10,
             'word_count': 10,
-            'readability_engagement': 10,
+            'readability_engagement': 15,
             'faq_section': 5,
             'internal_linking': 5
         }
@@ -1300,8 +1250,8 @@ class SEOEvaluatorAgent:
         else:
             details.append("Include a keyword in the title.")
 
-        feedback = "Title/Meta OK." if score >= 18 else " | ".join(details)
-        return SEOMetric(name="Title/Meta Optimization", score=score, weight=20, max_score=20, feedback=feedback)
+        feedback = "Title/Meta OK." if score >= 12 else " | ".join(details)
+        return SEOMetric(name="Title/Meta Optimization", score=score, weight=15, max_score=15, feedback=feedback)
 
     def _evaluate_keyword_integration(self, article: ArticleDraft) -> SEOMetric:
         score = 0
@@ -1309,12 +1259,7 @@ class SEOEvaluatorAgent:
         unique_keywords = [kw for kw in article.metadata.keywords if isinstance(kw, str)]
         found_kws = sum(1 for kw in unique_keywords if kw.lower() in content_lower)
 
-        # Unique keyword coverage (up to 10 points)
-        if unique_keywords:
-            coverage_ratio = found_kws / len(unique_keywords)
-            score += int(coverage_ratio * 10)
-
-        # Keyword density (up to 10 points)
+        # Keyword density (up to 12 points)
         density = 0.0
         if article.word_count > 0:
             total_mentions = sum(content_lower.count(kw.lower()) for kw in unique_keywords)
@@ -1322,9 +1267,14 @@ class SEOEvaluatorAgent:
 
             # Broadened range to accommodate overlapping keywords (niche specific)
             if 0.5 <= density <= 15.0:
-                score += 10
+                score += 12
             elif 0.3 <= density < 0.5 or 15.0 < density <= 18.0:
-                score += 5
+                score += 8
+
+        # Unique keyword coverage (up to 8 points)
+        if unique_keywords:
+            coverage_ratio = found_kws / len(unique_keywords)
+            score += int(coverage_ratio * 8)
 
         feedback = f"Keywords: {found_kws}/{len(unique_keywords)} found (Density: {density:.2f}%)."
         if score < 15:
@@ -1434,10 +1384,10 @@ class SEOEvaluatorAgent:
         if '<strong>' in article.content_html or '<b>' in article.content_html:
             score += 3
         feedback = (
-            "Readability is good." if score > 7
+            "Readability is good." if score > 10
             else "Improve readability with more paragraphs, lists, and bold text."
         )
-        return SEOMetric(name="Readability & Engagement", score=score, weight=10, max_score=10, feedback=feedback)
+        return SEOMetric(name="Readability & Engagement", score=score, weight=15, max_score=15, feedback=feedback)
 
     def _evaluate_faq_section(self, article: ArticleDraft) -> SEOMetric:
         score = 0

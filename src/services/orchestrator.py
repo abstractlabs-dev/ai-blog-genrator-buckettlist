@@ -611,7 +611,7 @@ class BlogGeneratorOrchestrator:
                 title=title,
                 reference_text=reference_text,
                 article_type=article_type,
-                target_keywords=override_keywords or [],
+                target_keywords=blog_ctx["target_keywords"],
                 category=category,
                 excluded_products=self.covered_services
             )
