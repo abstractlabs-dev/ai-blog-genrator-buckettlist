@@ -284,16 +284,6 @@ class BlogGeneratorOrchestrator:
                 return ["adventure sports", "rishikesh tourism", "things to do in rishikesh"]
                 
             return final_keywords
-                    "latest trends", Config.BRAND_NAME.lower(), "professional services"
-                ]
-
-            final_keywords = mandatory_keywords + [kw for kw in keyword_list if kw not in mandatory_keywords]
-
-            # Optional: If category is strictly set, you might want to filter 'final_keywords' roughly
-            # but that might be too aggressive. For now, prioritising the category in mandatory keywords helps.
-
-            logger.info("Extracted %s keywords from scraped keyword data (Category: %s)", len(final_keywords), category)
-            return final_keywords[:num_keywords]
 
         except Exception as error:
             logger.warning("Failed to extract keywords from scraped articles JSON: %s", error)
