@@ -63,6 +63,11 @@ class Config:
     FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY", "0.6"))
     WEBSITE_START_DATE = os.getenv("WEBSITE_START_DATE", "2024-01-01")
 
+    # Vertex AI / Google Gen AI SDK Configuration
+    GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "ai-blog-genrator")
+    GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "asia-south1")
+    USE_VERTEX_AI = os.getenv("USE_VERTEX_AI", "True").lower() == "true"
+
     # WordPress Configuration
     WORDPRESS_BASE_URL = os.getenv("WORDPRESS_BASE_URL")
     WORDPRESS_USERNAME = os.getenv("WORDPRESS_USERNAME")
@@ -70,16 +75,22 @@ class Config:
 
     @classmethod
     def validate_api_key(cls):
-        if not cls.GOOGLE_AI_STUDIO_API_KEY:
+        if cls.USE_VERTEX_AI:
+            if not cls.GOOGLE_CLOUD_PROJECT or not cls.GOOGLE_CLOUD_LOCATION:
+                logger.warning(
+                    "Vertex AI is enabled but GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_LOCATION is missing.\n"
+                    "Please check your .env file."
+                )
+            else:
+                logger.info("Vertex AI configuration loaded: Project=%s, Location=%s", 
+                            cls.GOOGLE_CLOUD_PROJECT, cls.GOOGLE_CLOUD_LOCATION)
+        elif not cls.GOOGLE_AI_STUDIO_API_KEY:
             logger.warning(
                 "GOOGLE_AI_STUDIO_API_KEY not found. Running in fallback (offline) mode.\n"
                 "Set it in your environment or .env to enable live generation."
             )
         else:
             logger.info("Google AI Studio API key loaded successfully")
-
-        if not cls.GOOGLE_AI_STUDIO_API_KEY:
-            logger.warning("Google AI Studio API key not found. Image generation will be skipped.")
 
     @classmethod
     def get_random_category(cls, article_type: str) -> str:

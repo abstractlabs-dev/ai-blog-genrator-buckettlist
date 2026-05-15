@@ -12,7 +12,8 @@ undetected-chromedriver>=3.5.0
 selenium>=4.15.0
 lxml>=4.9.0
 
-# LLM API wrapper with optimization (recommended)
+# LLM API wrapper with optimization
+google-genai>=0.1.0
 litellm>=1.17.0
 # For caching and performance optimization
 redis>=5.0.0
