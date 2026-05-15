@@ -88,10 +88,10 @@ services:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'text2vec-openai'
-      ENABLE_MODULES: 'text2vec-openai'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-google'
+      ENABLE_MODULES: 'text2vec-google'
       # Optional. Leave empty to let the app fall back to CSV-based internal links.
-      OPENAI_APIKEY: ${WEAVIATE_OPENAI_API_KEY}
+      GOOGLE_APIKEY: ${GOOGLE_AI_STUDIO_API_KEY}
       CLUSTER_HOSTNAME: 'node1'
     volumes:
       - weaviate-data:/var/lib/weaviate

@@ -317,7 +317,10 @@ class VectorStoreManager:
             if not client.collections.exists(self.class_name):
                 client.collections.create(
                     name=self.class_name,
-                    vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_openai(),
+                    vectorizer_config=wvc.config.Configure.Vectorizer.text2vec_google(
+                        model_id="text-embedding-004",
+                        api_endpoint="generative-ai"
+                    ),
                     properties=[
                         wvc.config.Property(name="text", data_type=wvc.config.DataType.TEXT),
                         wvc.config.Property(name="article_id", data_type=wvc.config.DataType.TEXT),

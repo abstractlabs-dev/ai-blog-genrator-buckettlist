@@ -1102,28 +1102,60 @@ class ContentGeneratorAgent:
             paragraph_templates.append(extra)
             current_words += len(extra.split())
 
+        # ── Better Paragraph Formatting & Dynamic Lists ──────────
         html_parts = [
             f"<h1>{title}</h1>",
             f"<h2>{primary_keyword.title()} Overview</h2>",
         ]
-        for idx, paragraph in enumerate(paragraph_templates):
-            if idx == 3:
-                html_parts.append(f"<h2>How To Evaluate {primary_keyword.title()}</h2>")
-            if idx == 6:
-                html_parts.append(f"<h3>Practical Booking and Selection Checklist</h3>")
-                html_parts.append(
-                    "<ul>"
-                    f"<li>Confirm the exact use case and requirements for <strong>{primary_keyword}</strong>.</li>"
-                    "<li>Verify safety certifications and read recent customer reviews.</li>"
-                    "<li>Compare long-term value rather than only upfront cost.</li>"
-                    "<li>Check the cancellation and refund policy before paying any deposit.</li>"
-                    "<li>Book in advance during peak season to secure preferred slots.</li>"
-                    "</ul>"
-                )
-            if idx == 8:
-                html_parts.append(f"<h2>Common Mistakes To Avoid</h2>")
-                html_parts.append("<h3>Building A Simple Action Plan</h3>")
-            html_parts.append(f"<p>{paragraph}</p>")
+
+        # Bold keywords naturally to simulate SEO optimization
+        processed_sentences = []
+        for p in paragraph_templates:
+            if random.random() > 0.5:
+                # Use case-insensitive replace for better bolding
+                p = re.sub(f"(?i)({re.escape(primary_keyword)})", r"<strong>\1</strong>", p, count=1)
+            processed_sentences.append(p)
+
+        # 1. Intro Paragraph (first 3 sentences)
+        if len(processed_sentences) >= 3:
+            html_parts.append(f"<p>{' '.join(processed_sentences[:3])}</p>")
+            processed_sentences = processed_sentences[3:]
+
+        # 2. Evaluation Section
+        html_parts.append(f"<h2>How To Evaluate {primary_keyword.title()}</h2>")
+        if len(processed_sentences) >= 3:
+            html_parts.append(f"<p>{' '.join(processed_sentences[:3])}</p>")
+            processed_sentences = processed_sentences[3:]
+
+        # 3. Dynamic Checklist
+        html_parts.append(f"<h3>Practical Booking and Selection Checklist</h3>")
+        html_parts.append("<ul>")
+        html_parts.append(f"<li>Confirm the exact use case and requirements for <strong>{primary_keyword}</strong>.</li>")
+        html_parts.append("<li>Verify safety certifications and read recent customer reviews.</li>")
+        html_parts.append("<li>Compare long-term value rather than only upfront cost.</li>")
+        html_parts.append("<li>Check the cancellation and refund policy before paying any deposit.</li>")
+        html_parts.append("<li>Book in advance during peak season to secure preferred slots.</li>")
+        
+        # Add 2 more dynamic points if available
+        if len(processed_sentences) >= 2:
+            html_parts.append(f"<li>{processed_sentences.pop(0)}</li>")
+            html_parts.append(f"<li>{processed_sentences.pop(0)}</li>")
+        html_parts.append("</ul>")
+
+        # 4. Common Mistakes Section
+        html_parts.append(f"<h2>Common Mistakes To Avoid</h2>")
+        html_parts.append("<h3>Building A Simple Action Plan</h3>")
+        
+        # 5. Remaining Content: chunk into multi-sentence paragraphs
+        while processed_sentences:
+            chunk_size = min(random.randint(3, 4), len(processed_sentences))
+            chunk = processed_sentences[:chunk_size]
+            html_parts.append(f"<p>{' '.join(chunk)}</p>")
+            processed_sentences = processed_sentences[chunk_size:]
+            
+            # Optionally add a subheading to break up long text blocks
+            if len(processed_sentences) > 4 and random.random() > 0.6:
+                html_parts.append(f"<h3>Maximising Your {primary_keyword.title()} Experience</h3>")
 
         html_content = "".join(html_parts)
         word_count = len(re.findall(r'\b\w+\b', self._extract_text_from_html(html_content)))
