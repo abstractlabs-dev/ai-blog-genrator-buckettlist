@@ -16,7 +16,7 @@ from typing import List, Dict, Optional, Tuple, Set
 
 from src.llm_client import call_llm, LLM_AVAILABLE
 from src.config import Config
-from src.models import ArticleDraft, Metadata, SEOReport, SEOMetric
+from src.models import ArticleDraft, Metadata, SEOReport, SEOMetric, LLMConfig
 from prompts.prompts import create_content_prompt, create_title_prompt
 
 
@@ -362,7 +362,7 @@ class ContentGeneratorAgent:
         # Get all available products not in excluded list
         available_products = [
             p for p in self.product_data
-            if p.get('product_name') not in excluded_products
+            if p.get(Config.PRODUCT_ID_COL) not in excluded_products
         ]
 
         if not available_products:
@@ -371,7 +371,7 @@ class ContentGeneratorAgent:
 
         # If rotation is empty or all products in rotation are excluded, create new rotation
         if not self._product_rotation or all(
-            p.get('product_name') in excluded_products
+            p.get(Config.PRODUCT_ID_COL) in excluded_products
             for p in self._product_rotation
         ):
             # Create new rotation with available products and shuffle
@@ -381,7 +381,7 @@ class ContentGeneratorAgent:
         # Remove excluded products from rotation
         self._product_rotation = [
             p for p in self._product_rotation
-            if p.get('product_name') not in excluded_products
+            if p.get(Config.PRODUCT_ID_COL) not in excluded_products
         ]
 
         if not self._product_rotation:
@@ -402,7 +402,7 @@ class ContentGeneratorAgent:
 
         available_products = [
             p for p in self.product_data
-            if p.get('product_name') not in excluded_products
+            if p.get(Config.PRODUCT_ID_COL) not in excluded_products
         ]
 
         if not available_products:
@@ -483,7 +483,7 @@ class ContentGeneratorAgent:
         if article_type == "brand":
             product = self._get_next_product()
             if product:
-                used_products.add(product.get('product_name'))
+                used_products.add(product.get(Config.PRODUCT_ID_COL))
 
         product_context = self._format_product_context(product)
         scraped_keywords: List[str] = []
@@ -548,7 +548,7 @@ class ContentGeneratorAgent:
                     next_product = self._get_next_product(excluded_products=list(used_products))
                     if next_product:
                         product = next_product
-                        used_products.add(product.get('product_name'))
+                        used_products.add(product.get(Config.PRODUCT_ID_COL))
                         product_context = self._format_product_context(product)
 
                 # Use sampled keywords for variety
@@ -558,12 +558,15 @@ class ContentGeneratorAgent:
                 )
 
                 content = call_llm(
-                    self.model_name,
                     prompt,
-                    max_tokens=1500,
-                    temperature=Config.TEMPERATURE,
-                    presence_penalty=Config.PRESENCE_PENALTY,
-                    frequency_penalty=Config.FREQUENCY_PENALTY
+                    config=LLMConfig(
+                        model_name=self.model_name,
+                        max_tokens=1500,
+                        temperature=Config.TEMPERATURE,
+                        presence_penalty=Config.PRESENCE_PENALTY,
+                        frequency_penalty=Config.FREQUENCY_PENALTY,
+                        task_name="Title Generation"
+                    )
                 )
 
                 # More robust parsing: handle 1., 1), -, and bullets
@@ -639,7 +642,7 @@ class ContentGeneratorAgent:
                         next_product = self._get_next_product(excluded_products=list(used_products))
                         if next_product:
                             product = next_product
-                            used_products.add(product.get('product_name'))
+                            used_products.add(product.get(Config.PRODUCT_ID_COL))
                             product_context = self._format_product_context(product)
 
                     if len(unique_titles) >= num:
@@ -841,14 +844,16 @@ class ContentGeneratorAgent:
             logger.info("Generating article in a single pass with temperature=%.2f", temperature)
 
             article_response, usage = call_llm(
-                self.model_name,
                 prompt,
-                max_tokens=4500,
-                temperature=temperature,  # From .env
-                presence_penalty=presence_penalty if presence_penalty is not None else Config.PRESENCE_PENALTY,
-                frequency_penalty=frequency_penalty if frequency_penalty is not None else Config.FREQUENCY_PENALTY,
-                include_usage=True,
-                task_name=f"Article Gen: {title[:30]}"
+                config=LLMConfig(
+                    model_name=self.model_name,
+                    max_tokens=4500,
+                    temperature=temperature,
+                    presence_penalty=presence_penalty if presence_penalty is not None else Config.PRESENCE_PENALTY,
+                    frequency_penalty=frequency_penalty if frequency_penalty is not None else Config.FREQUENCY_PENALTY,
+                    include_usage=True,
+                    task_name=f"Article Gen: {title[:30]}"
+                )
             )
 
             # Parse the final formatted content (pass category for slug generation)

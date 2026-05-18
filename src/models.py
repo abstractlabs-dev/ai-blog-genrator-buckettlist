@@ -7,11 +7,24 @@ import logging
 from datetime import datetime
 from typing import List, Dict
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.config import Config
 
 # --- Pydantic Models for Data Structuring ---
+class LLMConfig(BaseModel):
+    """Configuration for LLM generation parameters."""
+    model_name: str
+    max_tokens: int = 2000
+    temperature: float = 0.1
+    fallback_models: List[str] = Field(default_factory=list)
+    presence_penalty: float = 0.0
+    frequency_penalty: float = 0.0
+    timeout: int = 60
+    max_retries: int = 2
+    include_usage: bool = False
+    task_name: str = "LLM Generation"
+
 class Metadata(BaseModel):
     title: str = Field(..., max_length=60, description="Meta title under 60 characters")
     description: str = Field(..., max_length=156, description="Meta description under 156 characters")
@@ -44,7 +57,7 @@ class ArticleDraft(BaseModel):
     is_published: bool = False
     generated_at: datetime = Field(default_factory=datetime.now)
 
-    @validator('word_count')
+    @field_validator('word_count')
     @classmethod
     def validate_word_count(cls, value):
         if not Config.MIN_WORD_COUNT <= value <= Config.MAX_WORD_COUNT:
@@ -69,7 +82,7 @@ class SEOReport(BaseModel):
     iteration_number: int
     evaluated_at: datetime = Field(default_factory=datetime.now)
 
-    @validator('overall_score')
+    @field_validator('overall_score')
     @classmethod
     def validate_score(cls, value):
         return max(0, min(100, value))

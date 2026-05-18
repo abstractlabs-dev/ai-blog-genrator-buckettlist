@@ -15,7 +15,7 @@ from typing import Dict, Optional, Tuple
 from PIL import Image
 from src.config import Config
 from src.image_client import generate_blog_image
-from src.models import ArticleDraft, SEOReport, NoAvailableProductError, DuplicateArticleError, BlogGenerationError
+from src.models import ArticleDraft, SEOReport, NoAvailableProductError, DuplicateArticleError, BlogGenerationError, LLMConfig
 from src.agents import ContentGeneratorAgent, SEOEvaluatorAgent  
 from src.scraper import RobustScraper, SCRAPING_AVAILABLE
 from src.llm_client import call_llm, LLM_AVAILABLE
@@ -153,12 +153,15 @@ class BlogGeneratorOrchestrator:
 
             logger.info("Calling LLM to clean and generalize scraped content.")
             content = call_llm(
-                Config.MODEL_NAME,
                 prompt,
-                max_tokens=1800,
-                temperature=Config.TEMPERATURE,
-                presence_penalty=Config.PRESENCE_PENALTY,
-                frequency_penalty=Config.FREQUENCY_PENALTY
+                config=LLMConfig(
+                    model_name=Config.MODEL_NAME,
+                    max_tokens=1800,
+                    temperature=Config.TEMPERATURE,
+                    presence_penalty=Config.PRESENCE_PENALTY,
+                    frequency_penalty=Config.FREQUENCY_PENALTY,
+                    task_name="Scraped Content Cleaning"
+                )
             )
 
             # Parse response
@@ -835,7 +838,7 @@ class BlogGeneratorOrchestrator:
                 # Get deterministic Rishikesh travel scene (no LLM call needed)
                 visual_description = self._generate_visual_description(
                     clean_title,
-                    category=blog_ctx.get("category", "")
+                    category=parent_category
                 )
                 logger.info("Travel scene for image: %s", visual_description[:80])
 

@@ -54,7 +54,7 @@ class Config:
     # Backward-compat alias. Keep until old envs are migrated.
     GEMINI_API_KEY = GOOGLE_AI_STUDIO_API_KEY
 
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash")
     MODEL_NAME = GEMINI_MODEL
     IMAGE_MODEL = os.getenv("IMAGE_MODEL", "imagen-4.0-generate-001")
     API_KEY = os.getenv('API_KEY')

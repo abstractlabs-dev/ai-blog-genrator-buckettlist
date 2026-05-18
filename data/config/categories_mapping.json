@@ -1,14 +1,42 @@
 {
-    "parents": {
-        "generic_product_category_1": 1,
-        "generic_industry_category_1": 2
-    },
-    "generic_product_category_1": {
-        "dummy_subcategory_1": 10,
-        "dummy_subcategory_2": 11
-    },
-    "generic_industry_category_1": {
-        "dummy_subcategory_3": 20,
-        "dummy_subcategory_4": 21
-    }
+  "parents": {
+    "Product Categories": 1,
+    "Industry Categories": 1
+  },
+  "product_categories": {
+    "Bungee Jumping in Rishikesh": 1,
+    "River Rafting in Rishikesh": 1,
+    "Giant Swing & Tower Swing Rishikesh": 1,
+    "Flying Fox & Zipline Rishikesh": 1,
+    "Paragliding in Rishikesh": 1,
+    "Hot Air Balloon Rishikesh": 1,
+    "Adventure Camping Rishikesh": 1,
+    "Bike & Scooty Rental Rishikesh": 1,
+    "Trek & Temple Tours Rishikesh": 1,
+    "Multi-Activity Adventure Combos Rishikesh": 1,
+    "SCAD Jump Rishikesh": 1,
+    "Skywalk & Cliff Jumping Rishikesh": 1
+  },
+  "industry_categories": {
+    "Things To Do in Rishikesh": 1,
+    "Rishikesh Adventure Sports Guide": 1,
+    "Rishikesh Travel Tips & Planning": 1,
+    "Spiritual & Cultural Rishikesh": 1,
+    "Best Time to Visit Rishikesh": 1,
+    "Rishikesh Camping & Stays": 1,
+    "Rishikesh Food & Local Culture": 1,
+    "Rishikesh Transport & Getting Around": 1,
+    "Rishikesh Safety & Travel Advice": 1,
+    "Rishikesh Itineraries & Trip Plans": 1,
+    "Adventure Sports Comparisons": 1,
+    "Solo Travel Rishikesh": 1,
+    "Couple Trips Rishikesh": 1,
+    "Family Adventures Rishikesh": 1,
+    "Group & Corporate Adventures Rishikesh": 1,
+    "Best Hotels in Rishikesh": 1,
+    "Best Hostels in Rishikesh": 1,
+    "Best Restaurants & Cafes in Rishikesh": 1,
+    "Places to Visit in Rishikesh": 1,
+    "Bungee Jumping Operator Comparisons Rishikesh": 1
+  }
 }

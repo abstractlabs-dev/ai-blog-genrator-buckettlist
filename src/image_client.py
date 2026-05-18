@@ -3,15 +3,17 @@ import logging
 from typing import Optional, Tuple
 
 from src.config import Config
-from src.llm_client import get_client
+from src.llm_client import ClientManager
 
 logger = logging.getLogger(__name__)
 
 # Pricing per image for tested models
+# Pricing per image for tested models (May 2026 rates)
 IMAGE_PRICING = {
+    "imagen-4.0-ultra-001": 0.06,
+    "imagen-4.0-generate-001": 0.04,  # Standard
+    "imagen-4.0-fast-001": 0.02,
     "imagen-3.0-generate-001": 0.04,
-    "imagen-3.0-fast-generate-001": 0.02,
-    "imagen-4.0-generate-001": 0.04,
     "default": 0.04
 }
 
@@ -20,7 +22,7 @@ def generate_blog_image(prompt: str) -> Tuple[Optional[bytes], float]:
     Generates an image using Google's Imagen via the Gen AI SDK.
     """
     try:
-        client = get_client()
+        client = ClientManager.get_client()
     except Exception as e:
         logger.error("Could not initialize GenAI Client for image generation: %s", e)
         return None, 0.0
@@ -31,8 +33,10 @@ def generate_blog_image(prompt: str) -> Tuple[Optional[bytes], float]:
     # Supported image models in Vertex AI
     models_to_try = [
         primary_model,
+        "imagen-4.0-ultra-001",
+        "imagen-4.0-generate-001",
+        "imagen-4.0-fast-001",
         "imagen-3.0-generate-001",
-        "imagen-3.0-fast-generate-001",
     ]
 
     # Remove duplicates while preserving order
@@ -48,8 +52,7 @@ def generate_blog_image(prompt: str) -> Tuple[Optional[bytes], float]:
                 prompt=prompt,
                 config={
                     "number_of_images": 1,
-                    "aspect_ratio": "16:9",
-                    "add_watermark": False # Set as per preference
+                    "aspect_ratio": "16:9"
                 }
             )
 
