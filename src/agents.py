@@ -511,7 +511,7 @@ class ContentGeneratorAgent:
         except Exception as err:
             logger.warning("Failed to load scraped article keywords from JSON: %s", err)
 
-        if not LLM_AVAILABLE or not Config.GOOGLE_AI_STUDIO_API_KEY:
+        if not LLM_AVAILABLE or (not Config.GOOGLE_AI_STUDIO_API_KEY and not Config.USE_VERTEX_AI):
             return self._generate_fallback_titles(num)
 
         # Try multiple times to get enough unique titles
@@ -831,7 +831,7 @@ class ContentGeneratorAgent:
             category=category
         )
 
-        if not LLM_AVAILABLE or not Config.GOOGLE_AI_STUDIO_API_KEY:
+        if not LLM_AVAILABLE or (not Config.GOOGLE_AI_STUDIO_API_KEY and not Config.USE_VERTEX_AI):
             logger.warning("LLM not available or API key missing. Using fallback article content.")
             fallback_article = self._create_fallback_article(
                 title, target_keywords, article_type=article_type, category=category
@@ -1428,13 +1428,18 @@ class SEOEvaluatorAgent:
 
     def _evaluate_faq_section(self, article: ArticleDraft) -> SEOMetric:
         score = 0
-        if article.faq_section and len(article.faq_section) > 100:
-            score += 2
-        if article.faq_section.count('<h3>') >= 3:
-            score += 3
+        h3_count = article.faq_section.count('<h3>') if article.faq_section else 0
+        if h3_count >= 6:
+            score = 5
+        elif h3_count >= 4:
+            score = 3
+        elif h3_count >= 2:
+            score = 2
+        elif article.faq_section and len(article.faq_section) > 100:
+            score = 1
         feedback = (
-            "FAQ section is adequate." if score > 3
-            else "Add a more comprehensive FAQ section with at least 3 questions."
+            f"FAQ section has {h3_count} questions." if score >= 5
+            else f"Add more FAQ questions: found {h3_count}, need at least 7 for full coverage (PAA / AI Overviews)."
         )
         return SEOMetric(name="FAQ Section", score=score, weight=5, max_score=5, feedback=feedback)
 

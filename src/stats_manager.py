@@ -35,6 +35,8 @@ class StatsManager:
                     "wordpress": 0,
                     "blogger": 0,
                     "tumblr": 0,
+                    "linkedin": 0,
+                    "medium": 0,
                     "total": 0
                 }
             }
@@ -48,12 +50,24 @@ class StatsManager:
         cls._ensure_stats_file()
         try:
             with open(cls._stats_file, 'r', encoding='utf-8') as file_handle:
-                return json.load(file_handle)
+                data = json.load(file_handle)
+                if not isinstance(data, dict):
+                    data = {}
+                if "generated" not in data or not isinstance(data["generated"], dict):
+                    data["generated"] = {"total": 0}
+                if "published" not in data or not isinstance(data["published"], dict):
+                    data["published"] = {"wordpress": 0, "blogger": 0, "tumblr": 0, "linkedin": 0, "medium": 0, "total": 0}
+                else:
+                    # Ensure all standard platform keys are present
+                    for k in ["wordpress", "blogger", "tumblr", "linkedin", "medium", "total"]:
+                        if k not in data["published"]:
+                            data["published"][k] = 0
+                return data
         except Exception as error:
             logger.error("Failed to load stats from %s: %s", cls._stats_file, error)
             return {
                 "generated": {"total": 0},
-                "published": {"wordpress": 0, "blogger": 0, "tumblr": 0, "total": 0}
+                "published": {"wordpress": 0, "blogger": 0, "tumblr": 0, "linkedin": 0, "medium": 0, "total": 0}
             }
 
     @classmethod
@@ -106,7 +120,7 @@ class StatsManager:
         with cls._lock:
             default_stats = {
                 "generated": {"total": 0},
-                "published": {"wordpress": 0, "blogger": 0, "tumblr": 0, "total": 0}
+                "published": {"wordpress": 0, "blogger": 0, "tumblr": 0, "linkedin": 0, "medium": 0, "total": 0}
             }
             cls._save_stats(default_stats)
             logger.info("Reset all statistics to zero")

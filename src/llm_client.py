@@ -42,10 +42,13 @@ class ClientManager:
                         Config.GOOGLE_CLOUD_LOCATION
                     )
                 else:
-                    if not Config.GOOGLE_AI_STUDIO_API_KEY:
-                        raise ValueError("GOOGLE_AI_STUDIO_API_KEY is not set and Vertex AI is disabled.")
-                    cls._client = genai.Client(api_key=Config.GOOGLE_AI_STUDIO_API_KEY)
-                    logger.info("[CLIENT_INIT] Mode: API Key")
+                    if Config.GOOGLE_AI_STUDIO_API_KEY:
+                        cls._client = genai.Client(api_key=Config.GOOGLE_AI_STUDIO_API_KEY)
+                        logger.info("[CLIENT_INIT] Mode: API Key")
+                    else:
+                        # Auto-detect local ADC credentials to use the Gemini API (generativelanguage.googleapis.com)
+                        cls._client = genai.Client()
+                        logger.info("[CLIENT_INIT] Mode: Application Default Credentials (ADC) for Gemini API")
             except Exception as ex:
                 logger.error("[CLIENT_INIT_FAILED] Error: %s", ex)
                 raise

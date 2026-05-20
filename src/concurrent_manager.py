@@ -38,7 +38,9 @@ class ConcurrentCampaignManager:
         article_index: int,
         publish_to_wordpress: bool = False,
         publish_to_blogger: bool = False,
-        publish_to_tumblr: bool = False
+        publish_to_tumblr: bool = False,
+        publish_to_linkedin: bool = False,
+        publish_to_medium: bool = False
     ) -> dict:
         """
         A self-contained worker function for a single thread.
@@ -65,7 +67,9 @@ class ConcurrentCampaignManager:
                 article_type=article_type,
                 publish_to_wordpress=publish_to_wordpress,
                 publish_to_blogger=publish_to_blogger,
-                publish_to_tumblr=publish_to_tumblr
+                publish_to_tumblr=publish_to_tumblr,
+                publish_to_linkedin=publish_to_linkedin,
+                publish_to_medium=publish_to_medium
             )
 
             # 3. Return a success result with usage stats
@@ -113,7 +117,9 @@ class ConcurrentCampaignManager:
     def run_campaign(self, total_articles: int, max_workers: int = 6,
                      publish_to_wordpress: bool = False,
                      publish_to_blogger: bool = False,
-                     publish_to_tumblr: bool = False):
+                     publish_to_tumblr: bool = False,
+                     publish_to_linkedin: bool = False,
+                     publish_to_medium: bool = False):
         """
         Executes the full concurrent generation campaign.
         Safeguards: Continues generating until 'total_articles' successes are achieved,
@@ -166,7 +172,8 @@ class ConcurrentCampaignManager:
                 for atype in batch_types:
                     fut = executor.submit(
                         self._generate_article_worker, atype, 0,
-                        publish_to_wordpress, publish_to_blogger, publish_to_tumblr
+                        publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
+                        publish_to_linkedin, publish_to_medium
                     )
                     futures_set.add(fut)
 
@@ -187,7 +194,8 @@ class ConcurrentCampaignManager:
                     stats['max_attempts'] = max_attempts
                     self._handle_worker_result(
                         future, stats, executor, futures_set,
-                        publish_to_wordpress, publish_to_blogger, publish_to_tumblr
+                        publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
+                        publish_to_linkedin, publish_to_medium
                     )
 
                 # Check safety limit
@@ -211,7 +219,8 @@ class ConcurrentCampaignManager:
 
     def _handle_worker_result(
         self, future, stats, executor, futures_set,
-        publish_to_wordpress, publish_to_blogger, publish_to_tumblr
+        publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
+        publish_to_linkedin, publish_to_medium
     ):
         """Helper to process a completed worker future and manage retries."""
         stats["processed_attempts"] += 1
@@ -265,7 +274,9 @@ class ConcurrentCampaignManager:
                         stats["processed_attempts"] + 1,
                         publish_to_wordpress,
                         publish_to_blogger,
-                        publish_to_tumblr
+                        publish_to_tumblr,
+                        publish_to_linkedin,
+                        publish_to_medium
                     )
                     futures_set.add(new_fut)
                     print("   -> Re-queued 1 new task to replace failed/skipped article.")
@@ -285,7 +296,9 @@ class ConcurrentCampaignManager:
                     stats["processed_attempts"] + 1,
                     publish_to_wordpress,
                     publish_to_blogger,
-                    publish_to_tumblr
+                    publish_to_tumblr,
+                    publish_to_linkedin,
+                    publish_to_medium
                 )
                 futures_set.add(new_fut)
 

@@ -84,7 +84,7 @@ class Config:
             else:
                 logger.info("Vertex AI configuration loaded: Project=%s, Location=%s", 
                             cls.GOOGLE_CLOUD_PROJECT, cls.GOOGLE_CLOUD_LOCATION)
-        elif not cls.GOOGLE_AI_STUDIO_API_KEY:
+        elif not cls.GOOGLE_AI_STUDIO_API_KEY and not cls.USE_VERTEX_AI:
             logger.warning(
                 "GOOGLE_AI_STUDIO_API_KEY not found. Running in fallback (offline) mode.\n"
                 "Set it in your environment or .env to enable live generation."

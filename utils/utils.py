@@ -9,6 +9,7 @@ import re
 import csv
 import hashlib
 import logging
+from datetime import datetime
 from typing import List, Dict, Optional
 
 from src.config import Config
@@ -33,6 +34,8 @@ class CSVManager:
     # wp_published_title    — title WordPress actually rendered
     # blogger_published_url — live Blogger post URL (from Blogger API)
     # tumblr_published_url  — live Tumblr post URL (from Tumblr API)
+    # linkedin_published_path — native JSON file path for LinkedIn
+    # medium_published_path   — native JSON file path for Medium
     # platforms_published   — comma-separated: e.g. "wordpress,blogger"
     HEADER = [
         'article_no', 'article_id', 'date', 'title',
@@ -42,6 +45,8 @@ class CSVManager:
         'wp_published_title',     # Title WordPress actually rendered
         'blogger_published_url',  # Live Blogger post URL
         'tumblr_published_url',   # Live Tumblr post URL
+        'linkedin_published_path', # Path to native LinkedIn JSON payload
+        'medium_published_path',   # Path to native Medium JSON payload
         'platforms_published',    # Comma-sep list of confirmed platforms
         'short_description', 'keywords', 'project_name', 'article_published'
     ]
@@ -52,6 +57,54 @@ class CSVManager:
         os.makedirs(os.path.dirname(self.csv_path), exist_ok=True)
         if not os.path.exists(self.csv_path):
             self._write_header_only()
+        else:
+            self._migrate_headers_if_needed()
+
+    def _migrate_headers_if_needed(self) -> None:
+        """
+        Check if the CSV exists and has all current HEADER fields.
+        If any are missing, migrate the CSV while keeping all existing data intact.
+        """
+        if not os.path.exists(self.csv_path):
+            return
+        try:
+            with open(self.csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                existing_headers = next(reader, None)
+            
+            if not existing_headers:
+                # File is empty, just write header only
+                self._write_header_only()
+                return
+
+            # Check if there are missing columns
+            missing_columns = [col for col in self.header if col not in existing_headers]
+            if not missing_columns:
+                return
+
+            logger.info("Migrating articles.csv headers to include missing fields: %s", missing_columns)
+            
+            # Read all rows as dictionaries using the existing headers
+            rows = []
+            with open(self.csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Pre-populate missing columns with empty string
+                    for col in self.header:
+                        if col not in row:
+                            row[col] = ""
+                    rows.append(row)
+            
+            # Rewrite the file with the new header and all rows
+            with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(self.header)
+                for row in rows:
+                    writer.writerow([row.get(col, "") for col in self.header])
+            
+            logger.info("Successfully migrated articles.csv with new headers.")
+        except Exception as e:
+            logger.error("Failed to migrate articles.csv headers: %s", e)
 
     def _write_header_only(self) -> None:
         """Write just the header row — used for init and reset."""
@@ -86,6 +139,8 @@ class CSVManager:
                 "",  # wp_published_title
                 "",  # blogger_published_url
                 "",  # tumblr_published_url
+                "",  # linkedin_published_path
+                "",  # medium_published_path
                 "",  # platforms_published
                 short_description,
                 ','.join(article.metadata.keywords),
@@ -235,6 +290,109 @@ class CSVManager:
                 return False
         logger.warning("Article ID %s not found in CSV for Tumblr data update.", article_id)
         return False
+
+    def update_article_linkedin_data(self, article_id: str, linkedin_path: str) -> bool:
+        """
+        After a confirmed LinkedIn creation, write the local JSON path to the CSV
+        and append 'linkedin' to platforms_published.
+        """
+        articles = self.get_all_articles()
+        updated = False
+        new_rows = []
+        for row in articles:
+            if row.get('article_id') == article_id:
+                row['linkedin_published_path'] = linkedin_path or ""
+                row['article_published']       = 'yes'
+                platforms = [p.strip() for p in (row.get('platforms_published') or '').split(',') if p.strip()]
+                if 'linkedin' not in platforms:
+                    platforms.append('linkedin')
+                row['platforms_published'] = ','.join(platforms)
+                updated = True
+            new_rows.append([row.get(h, "") for h in self.header])
+
+        if updated:
+            try:
+                with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.header)
+                    writer.writerows(new_rows)
+                logger.info("LinkedIn path written for article %s | Path: %s", article_id, linkedin_path)
+                return True
+            except Exception as e:
+                logger.error("Failed to write LinkedIn path for article %s: %s", article_id, e)
+                return False
+        logger.warning("Article ID %s not found in CSV for LinkedIn path update.", article_id)
+        return False
+
+    def update_article_medium_data(self, article_id: str, medium_path: str) -> bool:
+        """
+        After a confirmed Medium creation, write the local JSON path to the CSV
+        and append 'medium' to platforms_published.
+        """
+        articles = self.get_all_articles()
+        updated = False
+        new_rows = []
+        for row in articles:
+            if row.get('article_id') == article_id:
+                row['medium_published_path'] = medium_path or ""
+                row['article_published']     = 'yes'
+                platforms = [p.strip() for p in (row.get('platforms_published') or '').split(',') if p.strip()]
+                if 'medium' not in platforms:
+                    platforms.append('medium')
+                row['platforms_published'] = ','.join(platforms)
+                updated = True
+            new_rows.append([row.get(h, "") for h in self.header])
+
+        if updated:
+            try:
+                with open(self.csv_path, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.header)
+                    writer.writerows(new_rows)
+                logger.info("Medium path written for article %s | Path: %s", article_id, medium_path)
+                return True
+            except Exception as e:
+                logger.error("Failed to write Medium path for article %s: %s", article_id, e)
+                return False
+        logger.warning("Article ID %s not found in CSV for Medium path update.", article_id)
+        return False
+
+    def add_external_article(self, article_name: str, platform: str) -> None:
+        """
+        Appends a row to articles_external.csv, tracking articles created for
+        linkedin or medium. Columns: Sr No, Name of the article, Generated At, Platform.
+        """
+        dir_path = os.path.dirname(self.csv_path)
+        ext_path = os.path.join(dir_path, "articles_external.csv")
+        
+        # Determine next Sr No
+        sr_no = 1
+        file_exists = os.path.exists(ext_path)
+        if file_exists:
+            try:
+                with open(ext_path, 'r', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    rows = list(reader)
+                    if len(rows) > 1:
+                        # Read the Sr No of the last row and increment
+                        last_row = rows[-1]
+                        if last_row and last_row[0].isdigit():
+                            sr_no = int(last_row[0]) + 1
+            except Exception as e:
+                logger.warning("Could not read articles_external.csv for Sr No calculation: %s", e)
+        
+        headers = ['Sr No', 'Name of the article', 'Generated At', 'Platform']
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        try:
+            with open(ext_path, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                if not file_exists or os.path.getsize(ext_path) == 0:
+                    writer.writerow(headers)
+                writer.writerow([sr_no, article_name, now_str, platform])
+            logger.info("External article '%s' (%s) logged to %s", article_name, platform, ext_path)
+        except Exception as e:
+            logger.error("Failed to write to articles_external.csv: %s", e)
 
     def get_all_published_slugs(self) -> set:
         """Return all confirmed WordPress slugs from previous runs (collision guard)."""

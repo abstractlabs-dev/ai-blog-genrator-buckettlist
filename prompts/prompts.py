@@ -231,6 +231,9 @@ def create_content_prompt(
     └────────────────────────────────────────────────────────────────┘
     """
 
+    # ── Determine article type early (needed for multiple blocks below) ────────
+    is_brand_article = article_type.lower() == "brand"
+
     # ── Client Directive: Media Asset Injection ─────────────────────────────
     media_injection_block = ""
     if media_assets:
@@ -261,18 +264,33 @@ def create_content_prompt(
     """
 
     # ── Client Directive: Conclusion CTA ────────────────────────────────────
-    conclusion_cta_block = f"""
+    # Brand articles get a soft single CTA. Generic articles get a neutral internal link suggestion.
+    if is_brand_article:
+        conclusion_cta_block = f"""
     ╔══════════════════════════════════════════════════════════════════╗
-    ║   CONCLUSION CTA RULES (CLIENT DIRECTIVE — MANDATORY)            ║
+    ║   CONCLUSION CTA RULES (CLIENT DIRECTIVE — BRAND ARTICLES)       ║
     ╚══════════════════════════════════════════════════════════════════╝
 
     The conclusion MUST always include:
-    1. A 2-3 sentence summary of the article's key points
-    2. A clear Book Now call-to-action linking to Bucketlistt:
-       <a href="{bucketlistt_cta_url}" target="_blank" rel="noopener">Book now on Bucketlistt</a>
-    3. A secondary WhatsApp CTA:
-       <a href="https://wa.me/918511838237" target="_blank" rel="noopener">Chat with Bucketlistt on WhatsApp</a>
-    4. The Bucketlistt USP reminder: "Pay only 10% to book — pay the rest at the site. Free DSLR video included."
+    1. A 2-3 sentence summary of the article's key points and key takeaways.
+    2. A single, natural booking suggestion (do NOT use pushy sales language):
+       Example: "Ready to experience this for yourself? Browse and compare options on
+       <a href="{bucketlistt_cta_url}" target="_blank" rel="noopener">Bucketlistt</a>."
+    3. Tone: Helpful and informative, NOT promotional. Write as a knowledgeable local guide.
+    """
+    else:
+        conclusion_cta_block = f"""
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║   CONCLUSION RULES (CLIENT DIRECTIVE — GENERIC ARTICLES)         ║
+    ╚══════════════════════════════════════════════════════════════════╝
+
+    The conclusion MUST:
+    1. Summarise 2-3 key practical takeaways from the article.
+    2. Encourage the reader to plan their visit to Rishikesh.
+    3. Optionally (not mandatory) include ONE natural contextual link:
+       Example: "For a curated list of verified operators and packages, you can explore options on
+       <a href="{bucketlistt_cta_url}" target="_blank" rel="noopener">Bucketlistt</a>."
+    4. Tone: Authoritative travel guide. NOT salesy or promotional.
     """
 
     # ── Client Directive: Link Placement Rule ───────────────────────────────
@@ -355,11 +373,14 @@ def create_content_prompt(
 
     You MUST add a mandatory FAQ section BEFORE the conclusion.
     REQUIREMENTS:
-    - 5-10 questions (aim for 7-8 for best PAA / featured snippet coverage)
-    - Source questions from: long-tail keyword variations of "{main_keyword}"
-    - Think: what would people type into Google Autocomplete about this topic?
-    - Also check the last section of Google results for "People Also Ask" style questions
-    - Each answer: 2-4 direct, factual sentences. No filler.
+    - MINIMUM 7 questions, aim for 8-10 for best PAA / featured snippet / AI Overview coverage.
+    - FAILURE TO INCLUDE AT LEAST 7 QUESTIONS WILL RESULT IN ARTICLE REJECTION.
+    - Source questions from REAL things people search on Google about "{main_keyword}":
+        • Google Autocomplete (type the keyword and note the dropdown suggestions)
+        • "People Also Ask" boxes at the bottom of search results
+        • Long-tail keyword variations ("how to", "best time", "is it safe", "cost", "duration")
+    - Each answer: 2-4 direct, factual, conversational sentences. NO filler or vague responses.
+    - Write answers as a knowledgeable local guide speaking to a first-time visitor.
     - Use FAQPage schema markup format (see output structure below)
     - NEVER use <h2> inside the FAQ body — ONLY <h3> for questions, <p> for answers
     """
@@ -388,9 +409,6 @@ def create_content_prompt(
         "retaining the core intent of the original title."
     )
     
-    # Determine if this is a brand-specific or generic article
-    is_brand_article = article_type.lower() == "brand"
-    
     # Add category context to the prompt
     category_context = ""
     if category:
@@ -413,20 +431,20 @@ def create_content_prompt(
     brand_specific_content = ""
     if is_brand_article:
         brand_specific_content = f"""
-        - **Brand Focus:** Naturally incorporate "{Config.BRAND_NAME}" throughout the article as a leader in the {Config.INDUSTRY_NAME}.
-        - **Brand Voice:** Maintain a professional yet approachable tone that reflects {Config.BRAND_NAME}'s expertise and authority.
-        - **Unique Selling Points:** Highlight {Config.BRAND_NAME}'s unique features, innovations, and advantages over competitors.{category_context}
-        - **Call-to-Action:** Include clear calls-to-action directing readers to learn more about {Config.BRAND_NAME}'s products/services.
+        - **Brand Tone:** Write as a knowledgeable local expert who happens to recommend {Config.BRAND_NAME} based on genuine experience. NOT as a salesperson.
+        - **Brand Mentions:** Mention "{Config.BRAND_NAME}" naturally 4-6 times MAXIMUM. More than 6 mentions feels promotional and hurts credibility.
+        - **Brand Voice:** Warm, helpful, and authoritative. Prioritise being useful to the reader over promoting the brand.{category_context}
+        - **Soft CTA:** One natural mention of booking/comparing via {Config.BRAND_NAME} — in the body and/or conclusion. NO hard sells.
         """
     
     # Set up industry-specific content
     industry_specific_content = f"""
-    - **Industry Focus:** Provide valuable, educational content about the {Config.INDUSTRY_NAME} without promoting any specific brand.{category_context}
-    - **Comprehensive Coverage:** Cover the topic thoroughly to establish authority and provide genuine value to readers.
-    - **Neutral Tone:** Maintain an objective, informative tone without favoring any particular company.
-    - **Actionable Advice:** Offer practical tips and advice that readers can apply regardless of brand preference.
-    - **Category vs Keywords:** The TOPIC is {category}. The KEYWORDS are just ingredients. If a keyword does not naturally fit the category, you must use it in a 'comparative' or 'contrast' context, but NEVER change the main topic of the article to match the keyword.
-    - **Category Balance:** Blend educational generic content WITH specific focus on the assigned category - avoid pure generic content that ignores the category.
+    - **Primary Focus:** Write a PRACTICAL, USEFUL travel guide for someone planning to visit Rishikesh. Every section should answer real questions a traveller would ask.{category_context}
+    - **Writing Style:** First-person knowledgeable travel guide voice. Think: experienced traveller sharing hard-won advice, not a corporate content writer.
+    - **Practical Content:** Include SPECIFIC details — best time of day/year to visit, what to wear, how to get there, approximate costs, safety tips, insider tips locals don't tell tourists.
+    - **Brand Neutral:** Do NOT mention {Config.BRAND_NAME} or any single booking platform by name in the article body. One optional soft mention in the conclusion only.
+    - **Category vs Keywords:** The TOPIC is {category}. The KEYWORDS are just ingredients. Use keywords where natural; never force them or change the core topic.
+    - **Local Authority:** Include at least one specific local detail that demonstrates real knowledge of Rishikesh (e.g. specific ghat names, local landmark, typical prices in INR, seasonal nuance).
     """
     
     # Set up the main content requirements
@@ -452,78 +470,75 @@ def create_content_prompt(
     if is_brand_article:
         content_structure = f"""
         **CONTENT STRUCTURE FOR BRAND-SPECIFIC ARTICLE:**
-        1.  **COMPELLING INTRODUCTION (200-250 words):**
-            - **CRITICAL UNIQUENESS REQUIREMENT:** The opening paragraph MUST be completely unique and avoid generic phrases.
-            - FORBIDDEN opening patterns: "In the world of...", "When it comes to...", "Have you ever...", "In today's...", "Introduction to...", "Welcome to...", "{Config.BRAND_NAME} offers...", "Are you looking for..."
-            - REQUIRED: Start with a specific, attention-grabbing fact, statistic, or scenario directly related to the article's topic.
-            - Hook examples: A surprising industry statistic, a recent trend shift, a common pain point, or a compelling question.
-            - Introduce {Config.BRAND_NAME} as a leader in the industry with a UNIQUE angle (not just "leading provider").
-            - SUBTLE LOCATION: Mention local expertise in {Config.TARGET_CITY}, {Config.TARGET_STATE} naturally (do not overdo it).
+        Write this as a helpful travel activity guide that features {Config.BRAND_NAME} as the recommended provider — NOT as a promotional brochure.
+
+        1.  **ENGAGING INTRODUCTION (200-250 words):**
+            - FORBIDDEN opening patterns: "In the world of...", "When it comes to...", "Have you ever...", "In today's...", "{Config.BRAND_NAME} offers...", "Are you looking for..."
+            - START with a vivid, specific scene or surprising fact about the activity/experience in {Config.TARGET_CITY}.
+            - Example: "The moment the zip-line harness clicks into place above the Ganges gorge, every fear transforms into exhilaration."
+            - Mention {Config.BRAND_NAME} ONCE in the intro — as a natural reference ("operators like {Config.BRAND_NAME}"), NOT as the main subject.
             - Include the primary keyword within the first 50 words.
 
-        2.  **MAIN SECTION 1 - {Config.BRAND_NAME}'s Unique Value Proposition (400-500 words):**
-            - Create an H2 heading like "Why Choose {Config.BRAND_NAME} for Your [Specific Need]?" (Avoid city in H2).
-            - Detail {Config.BRAND_NAME}'s key features, innovations, and what sets it apart.
-            - Use at least two H3 sub-sections here to explain specific technological or service advantages.
-            - Include specific examples, case studies, or statistics that demonstrate value.
+        2.  **MAIN SECTION 1 - Complete Activity Guide (400-500 words):**
+            - H2 heading: Practical guide to doing this activity in {Config.TARGET_CITY}.
+            - Cover: what to expect, how to prepare, what to wear/bring, physical requirements, safety basics.
+            - Use at least two H3 sub-sections (e.g. "What to Expect on the Day", "Safety Tips and Requirements").
+            - This section should be 80% practical info, 20% mentions of {Config.BRAND_NAME} as a recommended option.
 
-        3.  **MAIN SECTION 2 - Products/Services Deep Dive (400-500 words):**
-            - Use an H2 heading like "{Config.BRAND_NAME}'s Comprehensive {Config.INDUSTRY_NAME} Solutions".
-            - Provide an overview of {Config.BRAND_NAME}'s main products or services.
-            - Explain the science or technology behind the solutions (e.g., innovation factors, durability).
-            - Use at least two H3 sub-sections to break down different product lines or service tiers.
+        3.  **MAIN SECTION 2 - Planning Your Experience (400-500 words):**
+            - H2 heading: Planning and logistics (best time, how to get there, costs, booking tips).
+            - Include: approximate costs in INR, best season/time of day, how to reach the location, what's included.
+            - Mention {Config.BRAND_NAME}'s specific offerings (pricing, inclusions) as part of the practical comparison — NOT as advertisement.
+            - Use at least two H3 sub-sections.
 
-        4.  **MAIN SECTION 3 - The {Config.BRAND_NAME} Quality Standards & Local Impact (300-400 words):**
-            - Use an H2 heading like "Setting the Standard in {Config.INDUSTRY_NAME}".
-            - Highlight the benefits of choosing {Config.BRAND_NAME} over competitors.
-            - SUBTLE LOCATION: Mention how {Config.BRAND_NAME} serves the specific needs of {Config.TARGET_CITY} (weather patterns, local style, etc.).
-            - Include customer testimonials or success story summaries.
+        4.  **MAIN SECTION 3 - Local Tips & Insider Knowledge (300-400 words):**
+            - H2 heading: Insider tips and local knowledge for the best experience.
+            - Share genuine local knowledge: best photo spots, what to avoid, nearby spots to combine with this activity.
+            - Reference {Config.BRAND_NAME} naturally if relevant (e.g. "{Config.BRAND_NAME} provides guides who know the best spots").
 
-        5.  **STRONG CONCLUSION (150-200 words):**
-            - **CRITICAL UNIQUENESS REQUIREMENT:** The closing paragraph MUST be completely unique and forward-looking.
-            - FORBIDDEN closing patterns: "In conclusion...", "To sum up...", "In summary...", "As we have seen..."
-            - REQUIRED: End with a unique, trending, or thought-provoking statement about the future of the topic/industry.
-            - Provide actionable next steps or a compelling reason to act NOW (urgency, trending opportunity, limited insight).
-            - Include a clear call-to-action (e.g., "Contact {Config.BRAND_NAME} today", "Request a free consultation") with a UNIQUE hook.
-            - OPTIONAL: Reference emerging trends, innovations, or upcoming changes in {Config.INDUSTRY_NAME} to create urgency.
-            - Provide contact information or a link to learn more.
+        5.  **PRACTICAL CONCLUSION (150-200 words):**
+            - FORBIDDEN: "In conclusion...", "To sum up...", "In summary..."
+            - END with actionable next steps: when to book, what to do first, encouragement to take the leap.
+            - One natural booking mention: "You can compare operators and book your slot on {Config.BRAND_NAME}."
+            - Tone: encouraging and helpful, like advice from a friend who has done this many times.
         """
     else:
         content_structure = f"""
-        **CONTENT STRUCTURE FOR INDUSTRY-GENERIC ARTICLE:**
-        1.  **COMPELLING INTRODUCTION (200-250 words):**
-            - **CRITICAL UNIQUENESS REQUIREMENT:** The opening paragraph MUST be completely unique and avoid clichés.
-            - FORBIDDEN opening patterns: "In the world of...", "When it comes to...", "Have you ever...", "In today's...", "Introduction to...", "Welcome to...", "In this blog post...", "The industry of..."
-            - REQUIRED: Start with a specific, attention-grabbing fact, recent development, or surprising insight about the topic.
-            - Hook examples: Latest industry research, emerging technology trend, common misconception debunked, or compelling data point.
-            - Introduce the main topic and why it matters to the reader globally with a SPECIFIC angle.
+        **CONTENT STRUCTURE FOR GENERIC RISHIKESH TRAVEL GUIDE ARTICLE:**
+        Write this as a PRACTICAL, USEFUL guide for someone planning to visit Rishikesh. Every section must answer real questions a first-time or repeat traveller would have.
+
+        1.  **ENGAGING INTRODUCTION (200-250 words):**
+            - FORBIDDEN: "In the world of...", "When it comes to...", "In today's...", "Introduction to...", "In this blog post..."
+            - START with a vivid, specific detail that puts the reader in Rishikesh right now:
+              e.g. "The sound of the Ganges changes after dark..." or "Most travellers don't realise that {Config.TARGET_CITY} has two completely different personalities..."
+            - Hook from personal or local knowledge — NOT from generic statistics.
+            - State clearly what practical questions this article will answer.
             - Include the primary keyword within the first 50 words.
-            - **Note:** Do NOT mention specific brands or locations here.
 
-        2.  **MAIN SECTION 1 - Comprehensive Overview and Context (400-500 words):**
-            - Create an H2 heading that introduces the main topic.
-            - Provide a deep dive into the subject matter history or current status.
-            - Use at least two H3 subsections to explore different perspectives.
-            - Explain why this topic is critical in the modern {Config.INDUSTRY_NAME}.
+        2.  **MAIN SECTION 1 — What It Is & Why You Should Care (350-450 words):**
+            - H2: Explain the specific experience/activity/topic and why it matters for a Rishikesh trip.
+            - Be concrete: where exactly, what it involves, who it is right for.
+            - Use two H3 sub-sections (e.g. "What to Expect" and "Who Is It Best For").
+            - Include at least one specific local detail: a ghat name, a landmark, a local price in INR.
 
-        3.  **MAIN SECTION 2 - Technical Deep Dive & Analysis (400-500 words):**
-            - Use an H2 heading like "Technical Analysis of [Topic]".
-            - Discuss complex aspects, features, or considerations related to the topic.
-            - Use H3 subsections to explain specific mechanisms or "how it works".
-            - Provide examples and practical insights.
+        3.  **MAIN SECTION 2 — How To Do It: Practical Step-by-Step Guide (400-500 words):**
+            - H2: The practical HOW-TO section. This is the heart of the article.
+            - Cover: preparation, booking, what to wear/bring, getting there, what happens on the day.
+            - Use a numbered list OR bullet checklist for at least part of this section.
+            - Include: typical costs (INR), time required, physical requirements, safety notes.
+            - Use two H3 sub-sections.
 
-        4.  **MAIN SECTION 3 - Professional Best Practices (300-400 words):**
-            - Use an H2 heading like "Best Practices and Professional Standards".
-            - Offer actionable, expert-level advice and recommendations.
-            - Include detailed checklists or "pro-tips".
+        4.  **MAIN SECTION 3 — Insider Tips & Best Practices (300-400 words):**
+            - H2: Insider knowledge that separates experienced travellers from tourists.
+            - Share: best time of year, best time of day, what to avoid, nearby spots to combine.
+            - At least one genuinely local tip that is NOT in every other travel blog.
+            - Optional: seasonal variation (monsoon vs winter vs summer experience differences).
 
-        5.  **STRONG CONCLUSION (150-200 words):**
-            - **CRITICAL UNIQUENESS REQUIREMENT:** The closing paragraph MUST be unique, trending, and forward-looking.
-            - FORBIDDEN closing patterns: "In conclusion...", "To sum up...", "In summary...", "As we have seen..."
-            - REQUIRED: End with a compelling, thought-provoking statement about future trends, innovations, or emerging best practices.
-            - Provide actionable takeaways that readers can implement immediately.
-            - Reference current industry shifts, technological advancements, or sustainability trends to add urgency and relevance.
-            - Create a sense of momentum: "The future of [topic] is...", "As the industry evolves...", "Forward-thinking professionals are..."
+        5.  **PRACTICAL CONCLUSION (150-200 words):**
+            - FORBIDDEN: "In conclusion...", "To sum up...", "In summary..."
+            - END with clear, actionable next steps: when to book, what to do first, one key reminder.
+            - Tone: like a well-travelled friend giving their honest final recommendation.
+            - One optional soft link to a booking platform — only if naturally fits the content.
         """
     
     # Set up the SEO requirements with STRICT HTML FORMAT
@@ -696,17 +711,17 @@ def create_content_prompt(
     # Add brand-specific SEO requirements if needed
     if is_brand_article:
         seo_requirements += f"""
-        - Naturally include "{Config.BRAND_NAME}" in the content where appropriate (at least 10-15 times).
-        - **NATURAL SEO LOCALIZATION:** Naturally weave "{Config.TARGET_CITY}" into the narrative.
-        - **MANDATORY SEO BOOSTERS:** Use at least 4-5 of these specific phrases: "in {Config.TARGET_CITY}", "across {Config.TARGET_CITY}", "businesses in {Config.TARGET_CITY}", "projects in {Config.TARGET_CITY}", "best solutions in {Config.TARGET_CITY}", "top-rated in {Config.TARGET_CITY}", "services in {Config.TARGET_CITY}", "experts in {Config.TARGET_CITY}".
-        - Avoid keyword stuffing; ensure it reads like a professional article.
-        - Ensure the brand name is mentioned in at least two subheadings and the conclusion.
+        - Mention "{Config.BRAND_NAME}" naturally 4-6 times MAXIMUM. Excessive mentions feel promotional and harm reader trust.
+        - **LOCAL SEO:** Weave "{Config.TARGET_CITY}" into the narrative naturally. Aim for 4-6 mentions.
+        - **NATURAL PHRASES:** Use location phrases like "in {Config.TARGET_CITY}", "near the Ganges", "in the Himalayas" only where they add genuine context.
+        - The article must read like a helpful travel guide written by a local expert — NOT like a sales page.
         """
     else:
         seo_requirements += f"""
-        - **BRAND NEUTRALITY:** You are writing as an industry expert. DO NOT mention "{Config.BRAND_NAME}" in the content.
-        - **LOCAL RELEVANCE:** Naturally weave "{Config.TARGET_CITY}" and "{Config.TARGET_STATE}" into the narrative to provide regional context and local authority.
-        - **Objective Authority:** Focus on professional, broad industry expertise and standards while remaining relevant to the local market.
+        - **BRAND NEUTRALITY:** You are writing as an independent travel expert. Do NOT mention "{Config.BRAND_NAME}" in the article body.
+        - **LOCAL RELEVANCE:** Naturally weave "{Config.TARGET_CITY}" and "{Config.TARGET_STATE}" into the narrative (aim for 5-7 natural mentions).
+        - **Objective Authority:** Write from direct experience and knowledge. Specific, practical details build more trust than broad claims.
+        - **Reader First:** Every sentence should answer a question or solve a problem for someone planning a Rishikesh trip.
         """
     
     # Detect if this is a revision based on feedback
@@ -820,9 +835,10 @@ def create_content_prompt(
        - Less than 1100 words → REJECTED
        - Any language other than English → REJECTED
        - Missing Primary Keywords (< 3 mentions each) → REJECTED
-       - (Brand Only) Missing '{Config.TARGET_CITY}' (< 8 mentions) → REJECTED
+       - (Brand Only) Missing '{Config.TARGET_CITY}' (< 5 mentions) → REJECTED
        - (Generic Only) Missing '{Config.TARGET_CITY}' in article about Rishikesh travel → REJECTED
-       - Bucketlistt CTA missing from conclusion → REJECTED
+       - (Brand Only) No Bucketlistt reference anywhere in the article → REJECTED
+       - NOTE: Generic articles do NOT need a hard Bucketlistt CTA. One soft link in conclusion is optional.
 
     ╔══════════════════════════════════════════════════════════════════════════════════════════════════╗
     ╔══════════════════════════════════════════════════════════════════════════════════════════════════╗

@@ -68,6 +68,8 @@ async def root():
             "/campaign/publish": "Run concurrent generation & Publish to WordPress - requires API key",
             "/campaign/publish/blogger": "Run concurrent generation & Publish to Blogger (No Images) - requires API key",
             "/campaign/publish/tumblr": "Run concurrent generation & Publish to Tumblr (No Images) - requires API key",
+            "/campaign/publish/linkedin": "Run concurrent generation & Generate LinkedIn payloads - requires API key",
+            "/campaign/publish/medium": "Run concurrent generation & Generate Medium payloads - requires API key",
             "/scraper/run": "Run competitor blog scraper",
         },
         "authentication": "Use X-API-Key header for protected endpoints"
@@ -329,6 +331,80 @@ async def run_campaign_and_publish_tumblr(
         )
     except Exception as e:
         logger.error("Campaign run-publish-tumblr failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Campaign failed: {e}")
+
+
+@app.post("/campaign/publish/linkedin", response_model=CampaignResponse)
+async def run_campaign_and_publish_linkedin(
+    request: CampaignRequest,
+    authenticated: bool = Depends(verify_api_key)
+):
+    """
+    Run a concurrent article generation campaign AND generate LinkedIn copy-paste JSON payloads.
+    
+    - **total_articles**: Total number of articles to generate and export to LinkedIn JSON payload
+    - **max_workers**: Maximum number of concurrent workers
+    """
+    if _campaign_manager is None:
+        raise HTTPException(status_code=500, detail="Blog services are not initialized")
+    if request.total_articles <= 0 or request.max_workers <= 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="total_articles and max_workers must be positive integers"
+        )
+
+    try:
+        _campaign_manager.run_campaign(
+            total_articles=request.total_articles,
+            max_workers=request.max_workers,
+            publish_to_wordpress=False,
+            publish_to_blogger=False,
+            publish_to_tumblr=False,
+            publish_to_linkedin=True,
+            publish_to_medium=False
+        )
+        return CampaignResponse(
+            message=f"Campaign completed and LinkedIn payloads generated for {request.total_articles} articles. See logs for details."
+        )
+    except Exception as e:
+        logger.error("Campaign run-publish-linkedin failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Campaign failed: {e}")
+
+
+@app.post("/campaign/publish/medium", response_model=CampaignResponse)
+async def run_campaign_and_publish_medium(
+    request: CampaignRequest,
+    authenticated: bool = Depends(verify_api_key)
+):
+    """
+    Run a concurrent article generation campaign AND generate Medium copy-paste JSON payloads.
+    
+    - **total_articles**: Total number of articles to generate and export to Medium JSON payload
+    - **max_workers**: Maximum number of concurrent workers
+    """
+    if _campaign_manager is None:
+        raise HTTPException(status_code=500, detail="Blog services are not initialized")
+    if request.total_articles <= 0 or request.max_workers <= 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="total_articles and max_workers must be positive integers"
+        )
+
+    try:
+        _campaign_manager.run_campaign(
+            total_articles=request.total_articles,
+            max_workers=request.max_workers,
+            publish_to_wordpress=False,
+            publish_to_blogger=False,
+            publish_to_tumblr=False,
+            publish_to_linkedin=False,
+            publish_to_medium=True
+        )
+        return CampaignResponse(
+            message=f"Campaign completed and Medium payloads generated for {request.total_articles} articles. See logs for details."
+        )
+    except Exception as e:
+        logger.error("Campaign run-publish-medium failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Campaign failed: {e}")
 
 
