@@ -451,7 +451,7 @@ def create_content_prompt(
     content_requirements = f"""
     **META DATA REQUIREMENTS:**
     - **META_TITLE:** 50-65 characters, include primary keyword.
-    - **META_DESCRIPTION:** 140-160 characters, compelling summary that includes 1-2 keywords.
+    - **META_DESCRIPTION:** 120-155 characters (CRITICAL: Do NOT wrap in quotes, do NOT exceed 155 characters, and make sure it has at least 120 characters), compelling summary that includes 1-2 keywords.
         - **UNIQUENESS RULE:** MUST be an engaging "hook" or "curiosity gap".
         - **FORBIDDEN starters:** "Introduction to", "Welcome to", "In this article", "Discover how", "Looking for", "Explore our".
         - **MANDATORY:** Start with a bold claim, a surprising fact, or a direct solution-oriented statement.
@@ -752,10 +752,10 @@ def create_content_prompt(
     | **Keyword Density** | Overall primary keyword density must be between 2.0% - 6.0%. |
     | **Word Count** | MINIMUM 1100 words. (Expand on details, provide examples, explain 'why' and 'how'). |
     | **Title SEO** | Title MUST include at least one Primary Keyword. |
-    | **Location Density** | Mention '{Config.TARGET_CITY}' naturally at least 5-8 times. |
-    | **Location Booster** | Use phrases like "best solutions in {Config.TARGET_CITY}" or "experts in {Config.TARGET_CITY}" 3+ times. |
+    | **Location Density** | **STRICT MENTION COUNT LIMIT:** You MUST mention '{Config.TARGET_CITY}' exactly between 4 and 8 times TOTAL in the entire article. DO NOT exceed 9 mentions or write it less than 4 times. |
+    | **Location Booster** | **STRICT BOOSTER MENTIONS (MANDATORY):** You MUST include at least 4 of these exact phrases (case-insensitive) exactly once each: 'in {Config.TARGET_CITY}', 'across {Config.TARGET_CITY}', 'top-rated in {Config.TARGET_CITY}', 'services in {Config.TARGET_CITY}', 'experts in {Config.TARGET_CITY}', 'best quality in {Config.TARGET_CITY}', 'customers in {Config.TARGET_CITY}', 'projects in {Config.TARGET_CITY}'. Weave them in naturally (e.g. "rafting experts in {Config.TARGET_CITY}"). |
     | **Structure** | 1 H1, at least 4 H2s, at least 2 H3s under EVERY H2. |
-    | **Meta Data** | Meta Title: 50-65 chars. Meta Desc: 140-160 chars. |
+    | **Meta Data** | Meta Title: 50-65 chars. Meta Desc: 120-155 chars (CRITICAL: Do NOT wrap in quotes, strictly under 156 chars). |
     | **LANGUAGE** | **MUST be in English ONLY.** |
 
     {revision_instruction}
@@ -988,3 +988,49 @@ NO spaces in tags. Every tag must be properly closed.
 
 {raw_content}
 """
+
+
+def create_linkedin_prompt(title: str, content_html: str, keywords: List[str]) -> str:
+    """
+    Creates a prompt for generating an engaging, value-packed long-form LinkedIn article/post.
+    """
+    kws_str = ", ".join(keywords) if keywords else ""
+    return f"""
+You are an expert travel marketer and elite professional copywriter.
+Generate a highly engaging, professional, long-form LinkedIn article (post commentary) based on the following article details:
+
+**Title:** {title}
+**Target Keywords:** {kws_str}
+**Article Body (HTML/text):**
+{content_html[:5000]}
+
+### STRICT LinkedIn ARTICLE GUIDELINES (MANDATORY):
+1. **Long-Form, Article-Like Structure**:
+   - Do NOT write a brief 2-paragraph update. Write a comprehensive, value-rich LinkedIn article.
+   - Use sections divided by empty lines and bullet points to make it read like a premium article.
+   - Use engaging travel/professional emojis (🏔️, 📌, 🚀, 💡, 🛡️, 🌊) naturally.
+   - Avoid salesy or pushy language. Write as an authoritative local guide offering genuine value.
+2. **First 140 Characters Strategic Hook (CRITICAL)**:
+   - The first 140 characters of the post MUST contain an exceptionally powerful hook (a bold claim, unique local insight, or engaging question).
+   - This ensures the text looks spectacular in the user feed before it gets truncated by the "See more" button.
+3. **Structured Body Sections**:
+   - **Introduction**: Hook the reader and present a central theme.
+   - **Key Actionable Takeaways**: 3-4 bullet points outlining actual, practical details (e.g. costs, best times, secret tips) from the article. ELABORATE on each point with 2-3 detailed sentences. Do not write short 1-line bullet points.
+   - **Local Travel Insight**: Provide rich travel context, local atmosphere, safety guidelines, and professional tips.
+4. **Length and Character Constraints (ABSOLUTE)**:
+   - The entire commentary MUST be between 1,800 and 2,500 characters in length.
+   - To achieve this exact range, target these specific section lengths:
+     * **Introduction**: Write 2 substantial paragraphs (about 400-500 characters total) establishing the hook and local atmosphere.
+     * **Key Actionable Takeaways**: Write exactly 3 detailed bullet points. For each bullet point, write exactly 2-3 detailed sentences (about 250-300 characters per bullet point, totaling ~800-900 characters).
+     * **Local Travel Insight**: Write a solid paragraph of 3-4 sentences (about 400-500 characters) detailing professional tips, safety, and cultural expectations.
+     * **Hashtags and Call to Action**: About 150 characters at the bottom.
+   - Ensure the total character count is strictly between 1,800 and 2,400 characters. It MUST NOT exceed 2,500 characters under any circumstances so it fits within LinkedIn's 3,000 post limit.
+5. **No HTML Tags**:
+   - The output must be clean plain text formatted with spacing and emojis. DO NOT include any HTML tags like <b> or <p>.
+6. **Hashtags and CTA**:
+   - Append 4-5 relevant hashtags at the bottom (e.g., #Rishikesh, #AdventureTravel, #Bucketlistt).
+   - End with a compelling professional call to action to read the full guide.
+
+Return ONLY the ready-to-paste LinkedIn article text. Do not add any introductory/outro remarks or markdown code block backticks (like ```).
+"""
+

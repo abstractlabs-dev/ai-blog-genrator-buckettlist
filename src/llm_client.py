@@ -92,52 +92,71 @@ def call_llm(
                 models_to_try.append(clean_m)
 
     last_error = None
+    import time
     for attempt_model in models_to_try:
-        try:
-            logger.debug(
-                "[GENERATION_ATTEMPT] Task: %s | Model: %s",
-                config.task_name,
-                attempt_model
-            )
+        max_429_retries = 5
+        backoff_sec = 2.0
+        for retry_attempt in range(max_429_retries + 1):
+            try:
+                logger.debug(
+                    "[GENERATION_ATTEMPT] Task: %s | Model: %s (attempt %d)",
+                    config.task_name,
+                    attempt_model,
+                    retry_attempt
+                )
 
-            gen_config = types.GenerateContentConfig(
-                temperature=config.temperature,
-                max_output_tokens=config.max_tokens,
-                presence_penalty=config.presence_penalty,
-                frequency_penalty=config.frequency_penalty
-            )
+                gen_config = types.GenerateContentConfig(
+                    temperature=config.temperature,
+                    max_output_tokens=config.max_tokens,
+                    presence_penalty=config.presence_penalty,
+                    frequency_penalty=config.frequency_penalty
+                )
 
-            response = client.models.generate_content(
-                model=attempt_model,
-                contents=prompt,
-                config=gen_config
-            )
+                response = client.models.generate_content(
+                    model=attempt_model,
+                    contents=prompt,
+                    config=gen_config
+                )
 
-            content = response.text
-            if not content:
-                raise ValueError(f"Empty response from model {attempt_model}")
+                content = response.text
+                if not content:
+                    raise ValueError(f"Empty response from model {attempt_model}")
 
-            logger.info(
-                "[GENERATION_SUCCESS] Task: %s | Model: %s",
-                config.task_name,
-                attempt_model
-            )
+                logger.info(
+                    "[GENERATION_SUCCESS] Task: %s | Model: %s",
+                    config.task_name,
+                    attempt_model
+                )
 
-            if config.include_usage:
-                usage_data = _extract_usage_data(response, attempt_model)
-                return content, usage_data
+                if config.include_usage:
+                    usage_data = _extract_usage_data(response, attempt_model)
+                    return content, usage_data
 
-            return content
+                return content
 
-        except Exception as ex:
-            last_error = ex
-            logger.warning(
-                "[GENERATION_RETRY] Task: %s | Model: %s | Error: %s",
-                config.task_name,
-                attempt_model,
-                ex
-            )
-            continue
+            except Exception as ex:
+                last_error = ex
+                err_str = str(ex).upper()
+                is_429 = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "TOO MANY REQUESTS" in err_str
+                
+                if is_429 and retry_attempt < max_429_retries:
+                    logger.warning(
+                        "[GENERATION_429] Model %s hit rate limit (429/RESOURCE_EXHAUSTED). Retrying in %.1fs... Error: %s",
+                        attempt_model,
+                        backoff_sec,
+                        ex
+                    )
+                    time.sleep(backoff_sec)
+                    backoff_sec *= 2.0
+                    continue
+                else:
+                    logger.warning(
+                        "[GENERATION_RETRY] Task: %s | Model: %s | Error: %s",
+                        config.task_name,
+                        attempt_model,
+                        ex
+                    )
+                    break # Go to next model in fallback list
 
     raise RuntimeError(
         f"[GENERATION_FAILED] All models failed for task {config.task_name}. Last error: {last_error}"

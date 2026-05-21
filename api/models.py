@@ -60,3 +60,5 @@ class CampaignResponse(BaseModel):
     """Response model for concurrent campaign execution."""
 
     message: str
+
+

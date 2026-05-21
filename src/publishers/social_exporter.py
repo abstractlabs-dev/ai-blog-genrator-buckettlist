@@ -38,7 +38,9 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from src.config import Config
-from src.models import ArticleDraft
+from src.models import ArticleDraft, LLMConfig
+from src.llm_client import call_llm
+from prompts.prompts import create_linkedin_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -219,35 +221,87 @@ class SocialExporter:
         description = article.metadata.description or ""
         keywords    = list(article.metadata.keywords or [])
 
-        # Build hook — first 2 sentences of the article
-        raw_text   = _strip_html(article.content_html or "")
-        hook_text  = _excerpt(raw_text, max_chars=280)
+        commentary = ""
+        llm_success = False
+        try:
+            logger.info("Attempting to generate long-form LinkedIn article via LLM...")
+            prompt = create_linkedin_prompt(title, article.content_html or f"<p>{description}</p>", keywords)
+            commentary_response = call_llm(
+                prompt,
+                config=LLMConfig(
+                    model_name=Config.MODEL_NAME,
+                    max_tokens=4096,
+                    temperature=0.7,
+                    task_name=f"LinkedIn Post: {title[:20]}"
+                )
+            )
+            if isinstance(commentary_response, tuple):
+                commentary_response = commentary_response[0]
 
-        # Build hashtags from keywords
-        hashtags = _keywords_to_hashtags(
-            keywords + [
-                "Rishikesh", "Adventure", "Travel", "India", Config.BRAND_NAME
+            commentary_response = commentary_response.strip().strip('`').strip()
+            if commentary_response.startswith("markdown"):
+                commentary_response = commentary_response[8:].strip()
+            elif commentary_response.startswith("text"):
+                commentary_response = commentary_response[4:].strip()
+
+            related_text = _build_related_linkedin_text(related)
+            max_response_chars = 2800 - (len(related_text) if related_text else 0) - len(wp_url) - 50
+            if len(commentary_response) > max_response_chars:
+                logger.warning("LLM generated LinkedIn commentary too long (%d chars). Truncating response to %d...", len(commentary_response), max_response_chars)
+                sliced = commentary_response[:max_response_chars]
+                # Find last sentence boundary (period, exclamation, question mark followed by space or newline or end)
+                boundary_matches = list(re.finditer(r'[.!?](\s|\n|$)', sliced))
+                if boundary_matches:
+                    last_idx = boundary_matches[-1].end()
+                    commentary_response = sliced[:last_idx].strip() + "\n\n..."
+                else:
+                    last_space = sliced.rfind(" ")
+                    if last_space != -1:
+                        commentary_response = sliced[:last_space].strip() + "..."
+                    else:
+                        commentary_response = sliced.strip() + "..."
+
+            commentary_parts = [commentary_response]
+            if related_text:
+                commentary_parts.append(related_text)
+            commentary_parts.append(f"📖 Read the full guide: {wp_url}")
+
+            commentary = "\n\n".join(commentary_parts)
+            llm_success = True
+            logger.info("Successfully generated LLM LinkedIn article (%d chars).", len(commentary))
+        except Exception as exc:
+            logger.warning("LLM LinkedIn generation failed or offline: %s. Falling back to excerpt.", exc)
+
+        if not llm_success:
+            # Build hook — first 2 sentences of the article
+            raw_text   = _strip_html(article.content_html or "")
+            hook_text  = _excerpt(raw_text, max_chars=280)
+
+            # Build hashtags from keywords
+            hashtags = _keywords_to_hashtags(
+                keywords + [
+                    "Rishikesh", "Adventure", "Travel", "India", Config.BRAND_NAME
+                ]
+            )
+
+            # Related articles block
+            related_text = _build_related_linkedin_text(related)
+
+            # Full commentary — what the client pastes into LinkedIn
+            commentary_parts = [
+                f"🏔️ {title}",
+                "",
+                hook_text,
+                "",
             ]
-        )
-
-        # Related articles block
-        related_text = _build_related_linkedin_text(related)
-
-        # Full commentary — what the client pastes into LinkedIn
-        commentary_parts = [
-            f"🏔️ {title}",
-            "",
-            hook_text,
-            "",
-        ]
-        if related_text:
-            commentary_parts += [related_text, ""]
-        commentary_parts += [
-            f"📖 Read the full guide: {wp_url}",
-            "",
-            hashtags,
-        ]
-        commentary = "\n".join(commentary_parts)
+            if related_text:
+                commentary_parts += [related_text, ""]
+            commentary_parts += [
+                f"📖 Read the full guide: {wp_url}",
+                "",
+                hashtags,
+            ]
+            commentary = "\n".join(commentary_parts)
 
         payload = {
             "author": "urn:li:person:YOUR_MEMBER_ID",

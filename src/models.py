@@ -56,6 +56,11 @@ class ArticleDraft(BaseModel):
     image_description: str = ""
     is_published: bool = False
     generated_at: datetime = Field(default_factory=datetime.now)
+    article_id: str = ""
+    linkedin_path: str = ""
+    medium_path: str = ""
+    wp_link: str = ""
+    wp_slug: str = ""
 
     @field_validator('word_count')
     @classmethod

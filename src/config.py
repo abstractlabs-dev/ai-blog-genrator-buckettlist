@@ -30,8 +30,8 @@ class Config:
     BRAND_MENTION_RATIO = float(os.getenv("BRAND_MENTION_RATIO", "0.25"))
 
     # Location Configuration
-    TARGET_CITY = os.getenv("TARGET_CITY", "your_city")
-    TARGET_STATE = os.getenv("TARGET_STATE", "your_state")
+    TARGET_CITY = os.getenv("TARGET_CITY", "your_city").strip()
+    TARGET_STATE = os.getenv("TARGET_STATE", "your_state").strip()
 
     # Content Configuration
     BRAND_PROMOTION_ENABLED = os.getenv("BRAND_PROMOTION_ENABLED", "True").lower() == "true"
@@ -72,6 +72,13 @@ class Config:
     WORDPRESS_BASE_URL = os.getenv("WORDPRESS_BASE_URL")
     WORDPRESS_USERNAME = os.getenv("WORDPRESS_USERNAME")
     WORDPRESS_TOKEN = os.getenv("WORDPRESS_TOKEN")
+
+    # SMTP Email Configuration
+    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "darshshah.cs@gmail.com")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_TO = os.getenv("SMTP_TO", "prachi@bucketlistt.com")
 
     @classmethod
     def validate_api_key(cls):
@@ -114,6 +121,7 @@ class Config:
     SOCIAL_DIR         = os.path.join(OUTPUT_DIR, "social")
     SOCIAL_LINKEDIN_DIR = os.path.join(SOCIAL_DIR, "linkedin")
     SOCIAL_MEDIUM_DIR   = os.path.join(SOCIAL_DIR, "medium")
+    EMAILS_DIR          = os.path.join(OUTPUT_DIR, "emails")
 
     @classmethod
     def ensure_directories(cls):
@@ -126,6 +134,7 @@ class Config:
             os.makedirs(cls.JSON_OUTPUT_DIR, exist_ok=True)
             os.makedirs(cls.SOCIAL_LINKEDIN_DIR, exist_ok=True)
             os.makedirs(cls.SOCIAL_MEDIUM_DIR, exist_ok=True)
+            os.makedirs(cls.EMAILS_DIR, exist_ok=True)
             logger.info("Storage directories ensured under: %s", cls.BASE_DIR)
         except Exception as error:
             logger.warning("Could not create storage directories at %s: %s", cls.BASE_DIR, error)

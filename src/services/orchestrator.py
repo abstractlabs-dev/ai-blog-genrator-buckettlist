@@ -808,12 +808,22 @@ class BlogGeneratorOrchestrator:
         # Keep the article object in sync for WordPress publisher
         article.generated_at = meta["generated"]
 
-        # Save to database (now with cleaned title and synced date)
-        meta["id"] = self.csv_manager.save_article(article, meta["short_desc"], product_name=meta["product_name"])
-        self.vector_store.add_article(article, meta["id"])
+        # Defer writing to database if generating for LinkedIn or Medium to ensure it updates ONLY after successful email
+        defer_db_write = publish_to_linkedin or publish_to_medium
+        if defer_db_write:
+            import hashlib
+            article_id = hashlib.md5(article.title.encode()).hexdigest()[:8]
+            meta["id"] = article_id
+            article.article_id = article_id
+            logger.info("Deferred initial database registration. Generated deterministic ID: %s", article_id)
+        else:
+            # Save to database (now with cleaned title and synced date)
+            meta["id"] = self.csv_manager.save_article(article, meta["short_desc"], product_name=meta["product_name"])
+            article.article_id = str(meta["id"]) if meta["id"] is not None else ""
+            self.vector_store.add_article(article, meta["id"])
 
-        # Track generation stats
-        StatsManager.increment_generated()
+            # Track generation stats
+            StatsManager.increment_generated()
 
         img_ctx = {
             "path": "",
@@ -1068,6 +1078,8 @@ class BlogGeneratorOrchestrator:
                         wp_title = (wp_result.get('title') or {}).get('rendered', article.title)
 
                         article.is_published = True
+                        article.wp_link = wp_link
+                        article.wp_slug = wp_slug
 
                         # Write confirmed WP URL/slug/title back into CSV — this is the
                         # ground-truth record that prevents slug collisions in future runs
@@ -1176,14 +1188,19 @@ class BlogGeneratorOrchestrator:
                     related_articles=related
                 )
 
-                # Save path to articles.csv and update platforms list
-                self.csv_manager.update_article_linkedin_data(meta["id"], paths["linkedin_path"])
+                if defer_db_write:
+                    article.linkedin_path = paths["linkedin_path"]
+                    logger.info("Deferred LinkedIn database writing. Path stored: %s", paths["linkedin_path"])
+                else:
+                    # Save path to articles.csv and update platforms list
+                    self.csv_manager.update_article_linkedin_data(meta["id"], paths["linkedin_path"])
+                    article.linkedin_path = paths["linkedin_path"]
 
-                # Log external article to articles_external.csv
-                self.csv_manager.add_external_article(article.title, "linkedin")
+                    # Log external article to articles_external.csv
+                    self.csv_manager.add_external_article(article.title, "linkedin")
 
-                # Increment stats
-                StatsManager.increment_published("linkedin")
+                    # Increment stats
+                    StatsManager.increment_published("linkedin")
                 logger.info("Successfully completed LinkedIn payload generation.")
             except Exception as error:
                 logger.error("LinkedIn payload generation failed: %s", error, exc_info=True)
@@ -1212,14 +1229,19 @@ class BlogGeneratorOrchestrator:
                     related_articles=related
                 )
 
-                # Save path to articles.csv and update platforms list
-                self.csv_manager.update_article_medium_data(meta["id"], paths["medium_path"])
+                if defer_db_write:
+                    article.medium_path = paths["medium_path"]
+                    logger.info("Deferred Medium database writing. Path stored: %s", paths["medium_path"])
+                else:
+                    # Save path to articles.csv and update platforms list
+                    self.csv_manager.update_article_medium_data(meta["id"], paths["medium_path"])
+                    article.medium_path = paths["medium_path"]
 
-                # Log external article to articles_external.csv
-                self.csv_manager.add_external_article(article.title, "medium")
+                    # Log external article to articles_external.csv
+                    self.csv_manager.add_external_article(article.title, "medium")
 
-                # Increment stats
-                StatsManager.increment_published("medium")
+                    # Increment stats
+                    StatsManager.increment_published("medium")
                 logger.info("Successfully completed Medium payload generation.")
             except Exception as error:
                 logger.error("Medium payload generation failed: %s", error, exc_info=True)

@@ -85,7 +85,12 @@ class ConcurrentCampaignManager:
                 "useful_tokens": article.useful_tokens.get('total_tokens', 0),
                 "useful_cost": article.useful_cost,
                 "has_image": bool(article.image_path),
-                "is_published": article.is_published
+                "is_published": article.is_published,
+                "article_id": getattr(article, "article_id", ""),
+                "linkedin_path": getattr(article, "linkedin_path", ""),
+                "medium_path": getattr(article, "medium_path", ""),
+                "wp_link": getattr(article, "wp_link", ""),
+                "wp_slug": getattr(article, "wp_slug", "")
             }
         except NoAvailableProductError as error:
             logger.warning("Worker %s skipped brand-specific article: %s", thread_name, error)
@@ -145,7 +150,8 @@ class ConcurrentCampaignManager:
             "articles_with_images_created": 0,
             "articles_published": 0,
             "articles_with_images_published": 0,
-            "total_articles": total_articles
+            "total_articles": total_articles,
+            "successful_articles": []
         }
 
         # Safety valve: Stop if we try too many times (e.g., 5x the target) to prevent infinite loops
@@ -216,6 +222,7 @@ class ConcurrentCampaignManager:
             "Campaign finished. Target: %s, Achieved: %s, Cost: $%.4f",
             total_articles, stats["success_count"], stats["total_cost"]
         )
+        return stats["successful_articles"]
 
     def _handle_worker_result(
         self, future, stats, executor, futures_set,
@@ -238,6 +245,7 @@ class ConcurrentCampaignManager:
 
             if status == 'success':
                 stats["success_count"] += 1
+                stats["successful_articles"].append(result)
                 if result.get('has_image'):
                     stats["articles_with_images_created"] += 1
                 if result.get('is_published'):

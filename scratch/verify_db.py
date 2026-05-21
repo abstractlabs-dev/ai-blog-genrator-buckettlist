@@ -78,10 +78,14 @@ def verify():
         stats_after = StatsManager.get_stats()
         print(f"Loaded Stats: {json.dumps(stats_after, indent=2)}")
         
-        # Assert that the wordpress count remains 150
-        assert stats_after["published"]["wordpress"] == 150, "WordPress stats got modified!"
-        assert stats_after["published"]["linkedin"] == 0, "linkedin stats not initialized to 0!"
-        assert stats_after["published"]["medium"] == 0, "medium stats not initialized to 0!"
+        # Assert that the wordpress count remains unchanged
+        assert stats_after["published"]["wordpress"] == stats_before["published"]["wordpress"], "WordPress stats got modified!"
+        
+        expected_linkedin = stats_before["published"].get("linkedin", 0)
+        assert stats_after["published"]["linkedin"] == expected_linkedin, f"linkedin stats mismatch! Expected: {expected_linkedin}, Got: {stats_after['published']['linkedin']}"
+        
+        expected_medium = stats_before["published"].get("medium", 0)
+        assert stats_after["published"]["medium"] == expected_medium, f"medium stats mismatch! Expected: {expected_medium}, Got: {stats_after['published']['medium']}"
         print("SUCCESS: StatsManager initialized successfully, preserving existing values and adding new platforms!")
         
         print("\n=== VERIFICATION PASSED SUCCESSFULLY ===")

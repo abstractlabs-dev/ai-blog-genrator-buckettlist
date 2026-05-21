@@ -847,7 +847,7 @@ class ContentGeneratorAgent:
                 prompt,
                 config=LLMConfig(
                     model_name=self.model_name,
-                    max_tokens=4500,
+                    max_tokens=8192,
                     temperature=temperature,
                     presence_penalty=presence_penalty if presence_penalty is not None else Config.PRESENCE_PENALTY,
                     frequency_penalty=frequency_penalty if frequency_penalty is not None else Config.FREQUENCY_PENALTY,
@@ -891,6 +891,7 @@ class ContentGeneratorAgent:
             meta_description = self._extract_section(content, "META_DESCRIPTION:", "\n") or (
                 f"Discover high-quality solutions with {Config.BRAND_NAME}."
             )
+            meta_description = meta_description.strip().strip('*').strip('_').strip('"').strip("'").strip()
 
             focus_keyword = self._extract_section(content, "FOCUS_KEYWORD:", "\n") or (
                 target_keywords[0] if target_keywords else ""
@@ -929,9 +930,20 @@ class ContentGeneratorAgent:
             final_title = actual_h1 if actual_h1 else title
             final_title = final_title.strip().replace('\n', ' ')
 
-            faq_section = self._extract_section(content, "FAQ_SECTION:", "JSON_LD_SCHEMA:") or (
-                self._generate_default_faq(final_title)
-            )
+            faq_match = re.search(r'(?i)(?:FAQ_SECTION:|<h2>\s*Frequently Asked Questions.*?</h2>|<div[^>]*class=["\']faq-section["\'][^>]*>)', content)
+            if faq_match:
+                start_pos = faq_match.start()
+                # If matched the literal "FAQ_SECTION:", start after it to exclude the marker
+                if content[start_pos:start_pos+12].upper() == "FAQ_SECTION:":
+                    start_pos += 12
+                
+                end_idx = content.find("JSON_LD_SCHEMA:", start_pos)
+                if end_idx != -1:
+                    faq_section = content[start_pos:end_idx].strip()
+                else:
+                    faq_section = content[start_pos:].strip()
+            else:
+                faq_section = self._generate_default_faq(final_title)
 
             html_content_cleaned = self._strip_json_ld(html_content)
             faq_section_cleaned = self._strip_json_ld(faq_section)
@@ -964,21 +976,64 @@ class ContentGeneratorAgent:
 
     def _extract_section(self, content: str, start_marker: str, end_marker: str) -> Optional[str]:
         try:
+            # 1. Try exact match to preserve existing precise behavior
             start_idx = content.find(start_marker)
-            if start_idx == -1:
+            if start_idx != -1:
+                start_idx += len(start_marker)
+                if not end_marker:
+                    return content[start_idx:].strip()
+                end_idx = content.find(end_marker, start_idx)
+                if end_idx != -1:
+                    return content[start_idx:end_idx].strip()
+                return content[start_idx:].strip()
+
+            # 2. Case-insensitive and markdown-tolerant robust fallback
+            if start_marker.startswith("<") and start_marker.endswith(">"):
+                start_pat = re.escape(start_marker)
+            else:
+                clean_start = re.sub(r'[^a-zA-Z0-9_]', '', start_marker)
+                if not clean_start:
+                    start_pat = re.escape(start_marker)
+                else:
+                    clean_start_pat = re.escape(clean_start).replace(r'\_', r'[\s\_]*')
+                    start_pat = r'(?i)(?:\*\*|##|#|\*|\s)*' + clean_start_pat + r'(?:\*\*|\*|:|\s)*'
+
+            start_match = re.search(start_pat, content)
+            if not start_match:
                 return None
-            start_idx += len(start_marker)
+
+            start_pos = start_match.end()
+
             if not end_marker:
-                return content[start_idx:].strip()
-            end_idx = content.find(end_marker, start_idx)
-            if end_idx == -1:
-                return content[start_idx:].strip()
-            return content[start_idx:end_idx].strip()
+                return content[start_pos:].strip()
+
+            if end_marker.startswith("<") and end_marker.endswith(">"):
+                end_pat = re.escape(end_marker)
+            elif end_marker == "\n":
+                end_pat = r'\n'
+            else:
+                clean_end = re.sub(r'[^a-zA-Z0-9_]', '', end_marker)
+                if not clean_end:
+                    end_pat = re.escape(end_marker)
+                else:
+                    clean_end_pat = re.escape(clean_end).replace(r'\_', r'[\s\_]*')
+                    end_pat = r'(?i)(?:\*\*|##|#|\*|\s)*' + clean_end_pat + r'(?:\*\*|\*|:|\s)*'
+
+            end_match = re.search(end_pat, content[start_pos:])
+            if not end_match:
+                return content[start_pos:].strip()
+
+            end_pos = start_pos + end_match.start()
+            return content[start_pos:end_pos].strip()
         except Exception:
             return None
 
     def _extract_html_content(self, content: str) -> str:
-        html_content = self._extract_section(content, "</h1>", "FAQ_SECTION:")
+        # Find where FAQ starts robustly
+        faq_match = re.search(r'(?i)(?:FAQ_SECTION:|<h2>\s*Frequently Asked Questions.*?</h2>|<div[^>]*class=["\']faq-section["\'][^>]*>)', content)
+        faq_marker = faq_match.group(0) if faq_match else "FAQ_SECTION:"
+
+        html_content = self._extract_section(content, "</h1>", faq_marker)
         if html_content:
             h1_line = self._extract_section(content, "<h1>", "</h1>")
             if h1_line:
@@ -986,9 +1041,8 @@ class ContentGeneratorAgent:
 
         h1_start = content.find("<h1>")
         if h1_start != -1:
-            faq_start = content.find("FAQ_SECTION:")
-            if faq_start != -1:
-                return content[h1_start:faq_start].strip()
+            if faq_match:
+                return content[h1_start:faq_match.start()].strip()
             return content[h1_start:].strip()
 
         return "<h1>Article Generation Failed</h1><p>Could not parse content.</p>"
@@ -1378,14 +1432,15 @@ class SEOEvaluatorAgent:
 
     def _evaluate_heading_structure(self, article: ArticleDraft) -> SEOMetric:
         score = 0
-        if '<h1>' in article.content_html:
+        if bool(re.search(r'<h1[^>]*>', article.content_html, re.IGNORECASE)):
             score += 2
-        h2_count = article.content_html.count('<h2>')
+        h2_count = len(re.findall(r'<h2[^>]*>', article.content_html, re.IGNORECASE))
         if h2_count >= 3:
             score += 4
         elif h2_count >= 1:
             score += 2
-        if article.content_html.count('<h3>') >= 2:
+        h3_count = len(re.findall(r'<h3[^>]*>', article.content_html, re.IGNORECASE))
+        if h3_count >= 2:
             score += 2
 
         headings = " ".join(re.findall(r'<h[1-3][^>]*>(.*?)</h[1-3]>', article.content_html, re.IGNORECASE)).lower()
@@ -1414,11 +1469,12 @@ class SEOEvaluatorAgent:
 
     def _evaluate_readability(self, article: ArticleDraft) -> SEOMetric:
         score = 0
-        if article.content_html.count('<p>') >= 10:
+        p_count = len(re.findall(r'<p[^>]*>', article.content_html, re.IGNORECASE))
+        if p_count >= 10:
             score += 4
-        if '<ul>' in article.content_html or '<ol>' in article.content_html:
+        if bool(re.search(r'<(ul|ol)[^>]*>', article.content_html, re.IGNORECASE)):
             score += 3
-        if '<strong>' in article.content_html or '<b>' in article.content_html:
+        if bool(re.search(r'<(strong|b)[^>]*>', article.content_html, re.IGNORECASE)):
             score += 3
         feedback = (
             "Readability is good." if score > 10
@@ -1428,7 +1484,7 @@ class SEOEvaluatorAgent:
 
     def _evaluate_faq_section(self, article: ArticleDraft) -> SEOMetric:
         score = 0
-        h3_count = article.faq_section.count('<h3>') if article.faq_section else 0
+        h3_count = len(re.findall(r'<h3[^>]*>', article.faq_section, re.IGNORECASE)) if article.faq_section else 0
         if h3_count >= 6:
             score = 5
         elif h3_count >= 4:

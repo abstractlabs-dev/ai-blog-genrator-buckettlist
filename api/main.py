@@ -68,8 +68,8 @@ async def root():
             "/campaign/publish": "Run concurrent generation & Publish to WordPress - requires API key",
             "/campaign/publish/blogger": "Run concurrent generation & Publish to Blogger (No Images) - requires API key",
             "/campaign/publish/tumblr": "Run concurrent generation & Publish to Tumblr (No Images) - requires API key",
-            "/campaign/publish/linkedin": "Run concurrent generation & Generate LinkedIn payloads - requires API key",
-            "/campaign/publish/medium": "Run concurrent generation & Generate Medium payloads - requires API key",
+            "/campaign/publish/linkedin": "Run concurrent generation & Generate LinkedIn payloads (Auto-emails in sets of 3) - requires API key",
+            "/campaign/publish/medium": "Run concurrent generation & Generate Medium payloads (Auto-emails in sets of 3) - requires API key",
             "/scraper/run": "Run competitor blog scraper",
         },
         "authentication": "Use X-API-Key header for protected endpoints"
@@ -334,6 +334,115 @@ async def run_campaign_and_publish_tumblr(
         raise HTTPException(status_code=500, detail=f"Campaign failed: {e}")
 
 
+import threading
+
+# Thread lock for database writes
+_db_write_lock = threading.Lock()
+
+def _commit_article_to_db(art: dict, platform: str):
+    """
+    Helper to append article to articles.csv, articles_external.csv and increment stats
+    thread-safely, only called when SMTP email is successfully sent.
+    """
+    import csv
+    import re
+    import json
+    import hashlib
+    from datetime import datetime
+    from src.stats_manager import StatsManager
+
+    title = art.get("title", "")
+    if not title:
+        logger.warning("Empty title, skipping DB commit.")
+        return
+
+    with _db_write_lock:
+        # 1. Calculate safe_filename and load JSON metadata
+        safe_filename = re.sub(r'[^a-zA-Z0-9 ]', '', title).replace(' ', '_')[:50]
+        json_path = os.path.join(Config.JSON_OUTPUT_DIR, f"{safe_filename}.json")
+        
+        meta_description = ""
+        keywords = []
+        generated_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        category = ""
+        
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    meta_data = json.load(f)
+                    meta_description = meta_data.get("meta_description", "")
+                    keywords = meta_data.get("keywords", [])
+                    if "generated_time" in meta_data:
+                        generated_time = meta_data["generated_time"]
+                    category = meta_data.get("category", "")
+            except Exception as e:
+                logger.error("Failed to read consolidated JSON at %s: %s", json_path, e)
+        else:
+            logger.warning("Consolidated JSON not found at %s", json_path)
+
+        # 2. Get unique slug and canonical URL
+        slug = ""
+        if _orchestrator and _orchestrator.content_generator and hasattr(_orchestrator.content_generator, 'slug_registry'):
+            slug = _orchestrator.content_generator.slug_registry.generate_unique_slug(title, category=category)
+        else:
+            # Fallback slug generation
+            slug = re.sub(r'[^a-z0-9-]', '', title.lower().replace(' ', '-'))[:60].rstrip('-')
+            
+        canonical_url = f"{Config.DEFAULT_LINK_URL}/{slug}"
+
+        # 3. Read existing articles to compute next article_no
+        existing_articles = _orchestrator.csv_manager.get_all_articles()
+        article_no = len(existing_articles) + 1
+        
+        # Get article ID
+        article_id = art.get("article_id") or hashlib.md5(title.encode()).hexdigest()[:8]
+        
+        linkedin_path = art.get("linkedin_path", "")
+        medium_path = art.get("medium_path", "")
+        
+        # 4. Save to articles.csv
+        try:
+            with open(Config.CSV_PATH, 'a', newline='', encoding='utf-8') as f:
+                csv.writer(f).writerow([
+                    article_no,
+                    article_id,
+                    generated_time,
+                    title,
+                    canonical_url,
+                    "",  # wp_published_url
+                    "",  # wp_published_slug
+                    "",  # wp_published_title
+                    "",  # blogger_published_url
+                    "",  # tumblr_published_url
+                    linkedin_path,
+                    medium_path,
+                    platform,  # platforms_published (e.g. "linkedin" or "medium")
+                    meta_description,
+                    ','.join(keywords) if isinstance(keywords, list) else str(keywords),
+                    art.get("product", ""),  # project_name
+                    "yes"  # article_published
+                ])
+            logger.info("Successfully appended article #%d '%s' to articles.csv", article_no, title)
+        except Exception as e:
+            logger.error("Failed to write to articles.csv: %s", e)
+
+        # 5. Save to articles_external.csv
+        try:
+            _orchestrator.csv_manager.add_external_article(title, platform)
+        except Exception as e:
+            logger.error("Failed to log external article to articles_external.csv: %s", e)
+
+        # 6. Update stats.json
+        try:
+            # Increment generated count
+            StatsManager.increment_generated()
+            # Increment platform published count
+            StatsManager.increment_published(platform)
+            logger.info("Successfully updated generation and publication stats in stats.json")
+        except Exception as e:
+            logger.error("Failed to update stats.json: %s", e)
+
+
 @app.post("/campaign/publish/linkedin", response_model=CampaignResponse)
 async def run_campaign_and_publish_linkedin(
     request: CampaignRequest,
@@ -341,6 +450,7 @@ async def run_campaign_and_publish_linkedin(
 ):
     """
     Run a concurrent article generation campaign AND generate LinkedIn copy-paste JSON payloads.
+    Automatically emails the generated articles in sets of 3.
     
     - **total_articles**: Total number of articles to generate and export to LinkedIn JSON payload
     - **max_workers**: Maximum number of concurrent workers
@@ -354,7 +464,7 @@ async def run_campaign_and_publish_linkedin(
         )
 
     try:
-        _campaign_manager.run_campaign(
+        successful_articles = _campaign_manager.run_campaign(
             total_articles=request.total_articles,
             max_workers=request.max_workers,
             publish_to_wordpress=False,
@@ -363,8 +473,31 @@ async def run_campaign_and_publish_linkedin(
             publish_to_linkedin=True,
             publish_to_medium=False
         )
+        
+        # Automatically chunk successful articles in sets of 3 and email them
+        from src.services.email_service import EmailService
+        email_service = EmailService()
+        
+        sets_sent = 0
+        committed_count = 0
+        for i in range(0, len(successful_articles), 3):
+            article_set = successful_articles[i:i+3]
+            if len(article_set) > 0:
+                logger.info("Dispatching set of %d articles to email service...", len(article_set))
+                email_result = email_service.send_articles_set(article_set)
+                if email_result == "sent":
+                    sets_sent += 1
+                    # Commit to database and stats ONLY when email sent via remote SMTP
+                    for art in article_set:
+                        _commit_article_to_db(art, "linkedin")
+                        committed_count += 1
+
         return CampaignResponse(
-            message=f"Campaign completed and LinkedIn payloads generated for {request.total_articles} articles. See logs for details."
+            message=(
+                f"Campaign completed. Generated {len(successful_articles)} LinkedIn payloads. "
+                f"Successfully dispatched {sets_sent} sets via email. "
+                f"Committed {committed_count} articles to database."
+            )
         )
     except Exception as e:
         logger.error("Campaign run-publish-linkedin failed: %s", e, exc_info=True)
@@ -378,6 +511,7 @@ async def run_campaign_and_publish_medium(
 ):
     """
     Run a concurrent article generation campaign AND generate Medium copy-paste JSON payloads.
+    Automatically emails the generated articles in sets of 3.
     
     - **total_articles**: Total number of articles to generate and export to Medium JSON payload
     - **max_workers**: Maximum number of concurrent workers
@@ -391,7 +525,7 @@ async def run_campaign_and_publish_medium(
         )
 
     try:
-        _campaign_manager.run_campaign(
+        successful_articles = _campaign_manager.run_campaign(
             total_articles=request.total_articles,
             max_workers=request.max_workers,
             publish_to_wordpress=False,
@@ -400,8 +534,31 @@ async def run_campaign_and_publish_medium(
             publish_to_linkedin=False,
             publish_to_medium=True
         )
+        
+        # Automatically chunk successful articles in sets of 3 and email them
+        from src.services.email_service import EmailService
+        email_service = EmailService()
+        
+        sets_sent = 0
+        committed_count = 0
+        for i in range(0, len(successful_articles), 3):
+            article_set = successful_articles[i:i+3]
+            if len(article_set) > 0:
+                logger.info("Dispatching set of %d articles to email service...", len(article_set))
+                email_result = email_service.send_articles_set(article_set)
+                if email_result == "sent":
+                    sets_sent += 1
+                    # Commit to database and stats ONLY when email sent via remote SMTP
+                    for art in article_set:
+                        _commit_article_to_db(art, "medium")
+                        committed_count += 1
+
         return CampaignResponse(
-            message=f"Campaign completed and Medium payloads generated for {request.total_articles} articles. See logs for details."
+            message=(
+                f"Campaign completed. Generated {len(successful_articles)} Medium payloads. "
+                f"Successfully dispatched {sets_sent} sets via email. "
+                f"Committed {committed_count} articles to database."
+            )
         )
     except Exception as e:
         logger.error("Campaign run-publish-medium failed: %s", e, exc_info=True)
