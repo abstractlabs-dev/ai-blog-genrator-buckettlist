@@ -10,11 +10,12 @@ import json
 import logging
 import os
 import random
+import threading
 from difflib import SequenceMatcher
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Set
 
-from src.llm_client import call_llm, LLM_AVAILABLE
+from src.llm_client import call_llm, LLM_AVAILABLE, RateLimitExhaustedError
 from src.config import Config
 from src.models import ArticleDraft, Metadata, SEOReport, SEOMetric, LLMConfig
 from prompts.prompts import create_content_prompt, create_title_prompt
@@ -52,6 +53,7 @@ class SlugRegistry:
         self.used_slugs: Set[str] = set()
         # Maps 5-word slug prefix → count of articles using it
         self.used_prefixes: Dict[str, int] = {}
+        self._lock = threading.Lock()
         self._load_from_csv()
 
     # ── Private helpers ──────────────────────────────────────────────────────
@@ -112,57 +114,60 @@ class SlugRegistry:
           4. If still colliding (rare), append incrementing counter (-YYMMDD-1 etc.)
           5. Register the final slug and return it
         """
-        base = self._semantic_core(title)
-        if not base:
-            # Extreme fallback: just sanitize the whole title
-            base = self._sanitize(title)
+        with self._lock:
+            base = self._semantic_core(title)
+            if not base:
+                # Extreme fallback: just sanitize the whole title
+                base = self._sanitize(title)
 
-        candidate = base[:self.MAX_SLUG_LEN].rstrip('-')
-        prefix5 = self._five_word_prefix(candidate)
+            candidate = base[:self.MAX_SLUG_LEN].rstrip('-')
+            prefix5 = self._five_word_prefix(candidate)
 
-        # Clean URL — no collision, use as-is
-        if candidate not in self.used_slugs and self.used_prefixes.get(prefix5, 0) == 0:
-            return candidate
+            # Clean URL — no collision, use as-is
+            if candidate not in self.used_slugs and self.used_prefixes.get(prefix5, 0) == 0:
+                return candidate
 
-        # Collision detected — append YYMMDD date suffix
-        date_tag = datetime.now().strftime('%y%m%d')
-        # Reserve 7 chars for -YYMMDD suffix
-        trimmed_base = candidate[:self.MAX_SLUG_LEN - 7].rstrip('-')
-        dated = f"{trimmed_base}-{date_tag}"
+            # Collision detected — append YYMMDD date suffix
+            date_tag = datetime.now().strftime('%y%m%d')
+            # Reserve 7 chars for -YYMMDD suffix
+            trimmed_base = candidate[:self.MAX_SLUG_LEN - 7].rstrip('-')
+            dated = f"{trimmed_base}-{date_tag}"
 
-        if dated not in self.used_slugs:
-            return dated
+            if dated not in self.used_slugs:
+                return dated
 
-        # Very rare: same base + same date → add counter
-        counter = 1
-        final = dated
-        while final in self.used_slugs and counter < 999:
-            suffix = f"-{date_tag}-{counter}"
-            final = f"{trimmed_base[:self.MAX_SLUG_LEN - len(suffix)]}{suffix}"
-            counter += 1
+            # Very rare: same base + same date → add counter
+            counter = 1
+            final = dated
+            while final in self.used_slugs and counter < 999:
+                suffix = f"-{date_tag}-{counter}"
+                final = f"{trimmed_base[:self.MAX_SLUG_LEN - len(suffix)]}{suffix}"
+                counter += 1
 
-        logger.warning(
-            "SlugRegistry: Collision resolved with counter slug '%s' (base='%s')",
-            final, base
-        )
-        return final
+            logger.warning(
+                "SlugRegistry: Collision resolved with counter slug '%s' (base='%s')",
+                final, base
+            )
+            return final
 
     def register(self, slug: str) -> None:
         """Register a slug as used after a successful publish or generation."""
         if not slug:
             return
-        self.used_slugs.add(slug)
-        prefix5 = self._five_word_prefix(slug)
-        self.used_prefixes[prefix5] = self.used_prefixes.get(prefix5, 0) + 1
-        logger.debug("SlugRegistry: Registered slug '%s' (prefix: '%s')", slug, prefix5)
+        with self._lock:
+            self.used_slugs.add(slug)
+            prefix5 = self._five_word_prefix(slug)
+            self.used_prefixes[prefix5] = self.used_prefixes.get(prefix5, 0) + 1
+            logger.debug("SlugRegistry: Registered slug '%s' (prefix: '%s')", slug, prefix5)
 
     def is_slug_available(self, slug: str) -> bool:
         """Returns True if neither the slug nor its 5-word prefix is taken."""
-        if slug in self.used_slugs:
-            return False
-        if self.used_prefixes.get(self._five_word_prefix(slug), 0) > 0:
-            return False
-        return True
+        with self._lock:
+            if slug in self.used_slugs:
+                return False
+            if self.used_prefixes.get(self._five_word_prefix(slug), 0) > 0:
+                return False
+            return True
 
 
 
@@ -181,6 +186,7 @@ class TitleManager:
         self.similarity_threshold = similarity_threshold or 0.7  # Lowered from 0.9 for better variety
         self.used_titles: Set[str] = set()
         self.starting_word_counts: Dict[str, int] = {}  # Track how many times each starting word is used
+        self._lock = threading.Lock()
         self._load_used_titles()
 
     def _load_used_titles(self) -> None:
@@ -243,17 +249,20 @@ class TitleManager:
             return
 
         title_lower = title.lower().strip()
-        if title_lower in self.used_titles:
-            return
+        
+        with self._lock:
+            if title_lower in self.used_titles:
+                return
+            self.used_titles.add(title_lower)
 
-        self.used_titles.add(title_lower)
-
-        # Track the starting word
-        first_word = title_lower.split()[0] if title_lower.split() else ""
-        if first_word:
-            self.starting_word_counts[first_word] = self.starting_word_counts.get(first_word, 0) + 1
+            # Track the starting word
+            first_word = title_lower.split()[0] if title_lower.split() else ""
+            if first_word:
+                self.starting_word_counts[first_word] = self.starting_word_counts.get(first_word, 0) + 1
 
         try:
+            # We don't lock the file IO to keep the lock duration short,
+            # but we assume the CSV append operation is atomic enough or handled via standard file locks.
             with open(self.csv_path, 'a', newline='', encoding='utf-8') as f_handle:
                 writer = csv.writer(f_handle)
                 writer.writerow([title, datetime.now().isoformat()])
@@ -267,33 +276,35 @@ class TitleManager:
 
         new_title = title.lower().strip()
 
-        # 1. Exact match check
-        if new_title in self.used_titles:
-            return True
-
-        # 2. Starting word overuse check
-        first_word = new_title.split()[0] if new_title.split() else ""
-        overused_starts = ["mastering", "discover", "unveiling", "unlocking", "the", "ultimate", "how", "why"]
-        limit = 2 if first_word in overused_starts else max(3, int(len(self.used_titles) * 0.04))
-        if first_word and self.starting_word_counts.get(first_word, 0) >= limit:
-            logger.debug("Title '%s' rejected: starting word '%s' reached limit of %s", title, first_word, limit)
-            return True
-
-        # 3. High similarity ratio check + 3-word prefix repeat check
-        for used_title in self.used_titles:
-            similarity = SequenceMatcher(None, new_title, used_title).ratio()
-            if similarity > self.similarity_threshold:
-                logger.debug("Title too similar: '%s' matches '%s' with score %.2f", title, used_title, similarity)
+        with self._lock:
+            # 1. Exact match check
+            if new_title in self.used_titles:
                 return True
-            new_words = new_title.split()[:3]
-            used_words = used_title.split()[:3]
-            if len(new_words) >= 2 and len(used_words) >= 2 and new_words == used_words:
-                logger.debug("Title prefix match: '%s' is already used.", ' '.join(new_words))
+
+            # 2. Starting word overuse check
+            first_word = new_title.split()[0] if new_title.split() else ""
+            overused_starts = ["mastering", "discover", "unveiling", "unlocking", "the", "ultimate", "how", "why"]
+            limit = 2 if first_word in overused_starts else max(3, int(len(self.used_titles) * 0.04))
+            if first_word and self.starting_word_counts.get(first_word, 0) >= limit:
+                logger.debug("Title '%s' rejected: starting word '%s' reached limit of %s", title, first_word, limit)
                 return True
+
+            # 3. High similarity ratio check + 3-word prefix repeat check
+            for used_title in self.used_titles:
+                similarity = SequenceMatcher(None, new_title, used_title).ratio()
+                if similarity > self.similarity_threshold:
+                    logger.debug("Title too similar: '%s' matches '%s' with score %.2f", title, used_title, similarity)
+                    return True
+                new_words = new_title.split()[:3]
+                used_words = used_title.split()[:3]
+                if len(new_words) >= 2 and len(used_words) >= 2 and new_words == used_words:
+                    logger.debug("Title prefix match: '%s' is already used.", ' '.join(new_words))
+                    return True
 
         # 4. SLUG PREFIX COLLISION CHECK — most important guard
         # If the prospective slug's 5-word prefix already exists, WordPress would
         # auto-append -2 / -3 on the second article. Reject at title level.
+        # Call slug_registry outside our lock to avoid cross-lock deadlocks!
         if slug_registry is not None:
             prospective_slug = slug_registry.generate_unique_slug(title)
             if not slug_registry.is_slug_available(prospective_slug):
@@ -837,6 +848,7 @@ class ContentGeneratorAgent:
                 title, target_keywords, article_type=article_type, category=category
             )
             fallback_article.category = str(category).strip() if category else ""
+            fallback_article.is_rate_limit_fallback = True  # Suppress image generation
             return fallback_article, product
 
         try:
@@ -872,12 +884,20 @@ class ContentGeneratorAgent:
 
             return article_draft, product
         except Exception as err:
-            logger.error("Error generating article content: %s", err)
-            logger.info("Falling back to offline article generation...")
+            if isinstance(err, RateLimitExhaustedError):
+                logger.error(
+                    "[RATE_LIMIT_EXHAUSTED] All LLM models rate-limited for article '%s'. "
+                    "Falling back to offline article generation (image will be suppressed). Error: %s",
+                    title[:50], err
+                )
+            else:
+                logger.error("Error generating article content: %s", err)
+                logger.info("Falling back to offline article generation...")
             fallback_article = self._create_fallback_article(
                 title, target_keywords, article_type=article_type, category=category
             )
             fallback_article.category = str(category).strip() if category else ""
+            fallback_article.is_rate_limit_fallback = True  # Suppress image generation
             return fallback_article, product
 
 

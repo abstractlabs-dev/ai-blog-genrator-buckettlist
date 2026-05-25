@@ -19,10 +19,30 @@ def generate_token(credentials_file, token_file):
     with open(token_file, "wb") as f_handle:
         pickle.dump(creds, f_handle)
 
-    print(f"✅ Token saved: {token_file}")
+    print(f"[SUCCESS] Token saved: {token_file}")
 
-# Generate token for your first blog
-#generate_token("src/credentials1.json", "tokens/blogger1.pkl")
-#generate_token("src/credentials2.json", "tokens/blogger2.pkl")
-generate_token("src/credentials3.json", "tokens/blogger3.pkl")
+# Generate tokens for any credentials files that exist
+for i in (1, 2, 3):
+    cred_paths = [
+        f"src/credentials/credentials{i}.json",
+        f"src/credentials{i}.json"
+    ]
+    cred_path = None
+    for cp in cred_paths:
+        if os.path.exists(cp):
+            cred_path = cp
+            break
+
+    tok_path = f"tokens/blogger{i}.pkl"
+    if cred_path:
+        print(f"[FOUND] Found {cred_path}. Starting authentication flow...")
+        try:
+            generate_token(cred_path, tok_path)
+        except Exception as e:
+            print(f"[ERROR] Error generating token for {cred_path}: {e}")
+    else:
+        print(f"[INFO] credentials{i}.json not found in src/ or src/credentials/, skipping.")
+
+
+
 

@@ -12,6 +12,10 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+import faulthandler
+# Enable crash reporting for C-level errors (segfaults, aborts)
+faulthandler.enable()
+
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
 import uvicorn
@@ -38,15 +42,9 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env before reading Config
 load_dotenv()
 
-try:
-    Config.ensure_directories()
-    Config.validate_api_key()
-    _orchestrator = BlogGeneratorOrchestrator()
-    _campaign_manager = ConcurrentCampaignManager(_orchestrator)
-except Exception as e:
-    logger.error("Failed to initialize blog services: %s", e, exc_info=True)
-    _orchestrator = None
-    _campaign_manager = None
+# Declare globals (will be initialized lazily inside startup event to be fork-safe)
+_orchestrator = None
+_campaign_manager = None
 
 
 app = FastAPI(
@@ -54,6 +52,18 @@ app = FastAPI(
     description="API for generating blog articles, running campaigns, and scraping competitor blogs.",
     version="2.1.0"
 )
+
+@app.on_event("startup")
+async def startup_event():
+    global _orchestrator, _campaign_manager
+    try:
+        Config.ensure_directories()
+        Config.validate_api_key()
+        _orchestrator = BlogGeneratorOrchestrator()
+        _campaign_manager = ConcurrentCampaignManager(_orchestrator)
+        logger.info("[STARTUP] Blog services successfully initialized in worker process.")
+    except Exception as e:
+        logger.error("[STARTUP_FAILED] Failed to initialize blog services: %s", e, exc_info=True)
 
 @app.get("/")
 async def root():

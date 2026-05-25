@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from ..config import Config
 from ..models import ArticleDraft
 from ..stats_manager import StatsManager
+from ..services.linking_manager import LinkingManager
 
 logger = logging.getLogger(__name__)
 
@@ -313,6 +314,17 @@ class WordPressPublisher:
             r"^\s*<h1[^>]*>.*?</h1>\s*", "", content_ctx["full"],
             flags=re.DOTALL | re.IGNORECASE
         )
+
+        # ── Bucketlistt.com Dynamic Linking ──────────────────────────────────
+        # Inject contextual backlinks (Tier 1) and a CTA widget (Tier 2) into
+        # the assembled HTML before sending it to the WP REST API.
+        try:
+            article.content_html = content_ctx["full"]
+            enriched_html = LinkingManager.inject_bucketlistt_links(article)
+            content_ctx["full"] = enriched_html
+            logger.info("[WordPress] Bucketlistt linking applied to '%s'.", article.metadata.title or article.title)
+        except Exception as link_err:
+            logger.warning("[WordPress] Bucketlistt linking failed (non-fatal): %s", link_err)
 
         # Prepare publish context
         # Use meta description if available, otherwise excerpt (already stripped/filtered in orchestrator)

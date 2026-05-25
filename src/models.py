@@ -55,6 +55,10 @@ class ArticleDraft(BaseModel):
     image_path: str = ""
     image_description: str = ""
     is_published: bool = False
+    # Set to True when the article content was produced by the offline fallback
+    # (i.e., the LLM was unavailable or all models were rate-limited).
+    # Used by the orchestrator to suppress image generation for fallback articles.
+    is_rate_limit_fallback: bool = False
     generated_at: datetime = Field(default_factory=datetime.now)
     article_id: str = ""
     linkedin_path: str = ""
