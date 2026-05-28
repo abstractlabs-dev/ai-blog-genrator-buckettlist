@@ -3,6 +3,8 @@ Concurrent Campaign Manager Module
 This module is responsible for running large-scale article generation campaigns
 concurrently, using a thread pool to manage multiple generation tasks at once.
 """
+import os
+import json
 import concurrent.futures
 import logging
 import math
@@ -40,7 +42,10 @@ class ConcurrentCampaignManager:
         publish_to_blogger: bool = False,
         publish_to_tumblr: bool = False,
         publish_to_linkedin: bool = False,
-        publish_to_medium: bool = False
+        publish_to_medium: bool = False,
+        category: str = "",
+        seed_title: str = "",
+        override_keywords: list[str] = None
     ) -> dict:
         """
         A self-contained worker function for a single thread.
@@ -54,7 +59,11 @@ class ConcurrentCampaignManager:
         try:
             # 1. Generate a unique title for this worker
             title_list = self.orchestrator.content_generator.generate_titles(
-                num=1, article_type=article_type
+                num=1,
+                article_type=article_type,
+                category=category,
+                seed_title=seed_title,
+                scraped_keywords=override_keywords
             )
             if not title_list:
                 raise ValueError("Could not generate a title.")
@@ -69,7 +78,9 @@ class ConcurrentCampaignManager:
                 publish_to_blogger=publish_to_blogger,
                 publish_to_tumblr=publish_to_tumblr,
                 publish_to_linkedin=publish_to_linkedin,
-                publish_to_medium=publish_to_medium
+                publish_to_medium=publish_to_medium,
+                category=category,
+                override_keywords=override_keywords
             )
 
             # 3. Return a success result with usage stats
@@ -154,6 +165,69 @@ class ConcurrentCampaignManager:
             "successful_articles": []
         }
 
+        # Prepare Coverage Mode Rotations & Seeds Pool
+        seeds = {"articles": [], "pool": []}
+        try:
+            if os.path.exists(Config.SCRAPED_ARTICLES_JSON):
+                with open(Config.SCRAPED_ARTICLES_JSON, 'r', encoding='utf-8') as file_handle:
+                    seeds["articles"] = json.load(file_handle)
+        except Exception as error:
+            logger.warning("Failed loading scraped articles for campaign seeds: %s", error)
+
+        seeds["pool"] = list(seeds["articles"])
+        random.shuffle(seeds["pool"])
+
+        industry_rotation = list(Config.INDUSTRY_CATEGORIES) or [Config.get_random_category("generic")]
+        random.shuffle(industry_rotation)
+
+        service_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
+        random.shuffle(service_category_rotation)
+
+        def get_next_job_params(article_type: str) -> dict:
+            nonlocal industry_rotation, service_category_rotation
+            seed_info = {
+                "title": "",
+                "keywords": None,
+                "category": None
+            }
+            if article_type == "generic" and seeds["pool"]:
+                # Pick a unique seed from the shuffled pool
+                obj = seeds["pool"].pop(0)
+                seed_info["title"] = obj.get("title", "")
+
+                # Let the seed's category (if available) drive the choice, otherwise rotation
+                scraped_cat = obj.get("category")
+                if scraped_cat:
+                    seed_info["category"] = scraped_cat
+                else:
+                    if not industry_rotation:
+                        industry_rotation = list(Config.INDUSTRY_CATEGORIES) or [Config.get_random_category("generic")]
+                        random.shuffle(industry_rotation)
+                    seed_info["category"] = industry_rotation.pop(0)
+
+                # Also use keywords from the seed if available
+                kws = obj.get("keywords")
+                if kws and isinstance(kws, list):
+                    seed_info["keywords"] = kws[:15]
+
+                # Refill pool if empty
+                if not seeds["pool"]:
+                    seeds["pool"] = list(seeds["articles"])
+                    random.shuffle(seeds["pool"])
+            elif article_type == "generic":
+                if not industry_rotation:
+                    industry_rotation = list(Config.INDUSTRY_CATEGORIES) or [Config.get_random_category("generic")]
+                    random.shuffle(industry_rotation)
+                seed_info["category"] = industry_rotation.pop(0)
+            else:
+                # For Brand-specific, use the product category rotation
+                if not service_category_rotation:
+                    service_category_rotation = list(Config.PRODUCT_CATEGORIES) or [Config.get_random_category("brand")]
+                    random.shuffle(service_category_rotation)
+                seed_info["category"] = service_category_rotation.pop(0)
+                
+            return seed_info
+
         # Safety valve: Stop if we try too many times (e.g., 5x the target) to prevent infinite loops
         max_attempts = total_articles * 5
 
@@ -176,10 +250,19 @@ class ConcurrentCampaignManager:
                 random.shuffle(batch_types)
 
                 for atype in batch_types:
+                    params = get_next_job_params(atype)
                     fut = executor.submit(
-                        self._generate_article_worker, atype, 0,
-                        publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
-                        publish_to_linkedin, publish_to_medium
+                        self._generate_article_worker,
+                        atype,
+                        0,
+                        publish_to_wordpress,
+                        publish_to_blogger,
+                        publish_to_tumblr,
+                        publish_to_linkedin,
+                        publish_to_medium,
+                        params["category"],
+                        params["title"],
+                        params["keywords"]
                     )
                     futures_set.add(fut)
 
@@ -201,7 +284,8 @@ class ConcurrentCampaignManager:
                     self._handle_worker_result(
                         future, stats, executor, futures_set,
                         publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
-                        publish_to_linkedin, publish_to_medium
+                        publish_to_linkedin, publish_to_medium,
+                        get_next_job_params
                     )
 
                 # Check safety limit
@@ -227,7 +311,8 @@ class ConcurrentCampaignManager:
     def _handle_worker_result(
         self, future, stats, executor, futures_set,
         publish_to_wordpress, publish_to_blogger, publish_to_tumblr,
-        publish_to_linkedin, publish_to_medium
+        publish_to_linkedin, publish_to_medium,
+        get_next_job_params
     ):
         """Helper to process a completed worker future and manage retries."""
         stats["processed_attempts"] += 1
@@ -276,6 +361,7 @@ class ConcurrentCampaignManager:
                         'brand' if random.random() < Config.BRAND_MENTION_RATIO
                         else 'generic'
                     )
+                    params = get_next_job_params(next_type)
                     new_fut = executor.submit(
                         self._generate_article_worker,
                         next_type,
@@ -284,7 +370,10 @@ class ConcurrentCampaignManager:
                         publish_to_blogger,
                         publish_to_tumblr,
                         publish_to_linkedin,
-                        publish_to_medium
+                        publish_to_medium,
+                        params["category"],
+                        params["title"],
+                        params["keywords"]
                     )
                     futures_set.add(new_fut)
                     print("   -> Re-queued 1 new task to replace failed/skipped article.")
@@ -298,6 +387,7 @@ class ConcurrentCampaignManager:
                 (stats["processed_attempts"] + len(futures_set)) < stats['max_attempts']
             ):
                 next_type = 'generic'  # Fallback safe type
+                params = get_next_job_params(next_type)
                 new_fut = executor.submit(
                     self._generate_article_worker,
                     next_type,
@@ -306,7 +396,10 @@ class ConcurrentCampaignManager:
                     publish_to_blogger,
                     publish_to_tumblr,
                     publish_to_linkedin,
-                    publish_to_medium
+                    publish_to_medium,
+                    params["category"],
+                    params["title"],
+                    params["keywords"]
                 )
                 futures_set.add(new_fut)
 

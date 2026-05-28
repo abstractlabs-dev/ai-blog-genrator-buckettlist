@@ -27,7 +27,7 @@ class LLMConfig(BaseModel):
 
 class Metadata(BaseModel):
     title: str = Field(..., max_length=60, description="Meta title under 60 characters")
-    description: str = Field(..., max_length=156, description="Meta description under 156 characters")
+    description: str = Field(..., min_length=120, max_length=155, description="Meta description 120-155 chars for Yoast green light")
     focus_keyword: str = Field("", description="Primary focus keyword for SEO")
     url_slug: str = Field(..., description="SEO-friendly URL slug")
     canonical_url: str = Field(..., description="Canonical URL")

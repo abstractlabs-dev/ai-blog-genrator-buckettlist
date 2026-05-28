@@ -67,13 +67,28 @@ class TumblrAccountSelector:
         return os.path.join(Config.PROJECT_ROOT, token_file)
 
     def _load_accounts_config(self) -> List[Dict[str, str]]:
+        """
+        Dynamically discover and load Tumblr accounts from environment variables.
+
+        Returns:
+            List of account configuration dictionaries.
+        """
         accounts: List[Dict[str, str]] = []
 
-        for i in (1, 2, 3):
-            blog_hostname = os.getenv(f"TUMBLR_BLOG_HOSTNAME{i}")
-            consumer_key = os.getenv(f"TUMBLR_CONSUMER_KEY{i}")
-            consumer_secret = os.getenv(f"TUMBLR_CONSUMER_SECRET{i}")
-            token_file = os.getenv(f"TUMBLR_TOKEN_FILE{i}")
+        # Dynamically discover all numbered credential suffixes from environment keys
+        numbered_indices = set()
+        for key in os.environ:
+            if key.startswith("TUMBLR_BLOG_HOSTNAME"):
+                suffix = key[len("TUMBLR_BLOG_HOSTNAME"):]
+                if suffix.isdigit():
+                    numbered_indices.add(int(suffix))
+
+        # Load each discovered numbered account
+        for idx in sorted(numbered_indices):
+            blog_hostname = os.getenv(f"TUMBLR_BLOG_HOSTNAME{idx}")
+            consumer_key = os.getenv(f"TUMBLR_CONSUMER_KEY{idx}")
+            consumer_secret = os.getenv(f"TUMBLR_CONSUMER_SECRET{idx}")
+            token_file = os.getenv(f"TUMBLR_TOKEN_FILE{idx}")
             if blog_hostname and consumer_key and consumer_secret and token_file:
                 accounts.append(
                     {
@@ -87,33 +102,25 @@ class TumblrAccountSelector:
         if accounts:
             return accounts
 
+        # Fallback to single account credentials
         blog_hostname = os.getenv("TUMBLR_BLOG_HOSTNAME")
         consumer_key = os.getenv("TUMBLR_CONSUMER_KEY")
         consumer_secret = os.getenv("TUMBLR_CONSUMER_SECRET")
         token_file = os.getenv("TUMBLR_TOKEN_FILE")
 
-        if blog_hostname and consumer_key and consumer_secret and token_file:
-            return [
+        if blog_hostname and consumer_key and consumer_secret:
+            if not token_file:
+                token_file = os.path.join(Config.PROJECT_ROOT, "tumblr_token.json")
+            accounts.append(
                 {
                     "blog_hostname": blog_hostname,
                     "consumer_key": consumer_key,
                     "consumer_secret": consumer_secret,
                     "token_file": token_file,
                 }
-            ]
+            )
 
-        token_file_default = os.path.join(Config.PROJECT_ROOT, "tumblr_token.json")
-        if blog_hostname and consumer_key and consumer_secret:
-            return [
-                {
-                    "blog_hostname": blog_hostname,
-                    "consumer_key": consumer_key,
-                    "consumer_secret": consumer_secret,
-                    "token_file": token_file_default,
-                }
-            ]
-
-        return []
+        return accounts
 
     def _load_tokens(self, token_file: str) -> Dict[str, str]:
         if not os.path.exists(token_file):

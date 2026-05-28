@@ -1,7 +1,7 @@
 import os
 import re
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import markdown
 
 from ..config import Config
@@ -56,7 +56,7 @@ class TumblrPublisher:
 
         Args:
             article: The article draft to publish
-            image_path: Optional path to featured image (not currently used by Tumblr text posts)
+            image_path: Optional path to featured image
 
         Returns:
             Dictionary with publication result including 'url' and 'id'
@@ -68,76 +68,8 @@ class TumblrPublisher:
         client = account["client"]
         blog_hostname = account["blog_hostname"]
 
-        # Convert Markdown to HTML
-        def convert_markdown_to_html(text: str) -> str:
-            if not text:
-                return ""
-            html_content = markdown.markdown(
-                text,
-                extensions=[
-                    'markdown.extensions.extra',
-                    'markdown.extensions.tables',
-                    'markdown.extensions.sane_lists',
-                    'markdown.extensions.toc'
-                ]
-            )
-            return html_content
-
-        # Convert both main content and FAQ section from Markdown to HTML
-        content_ctx = {
-            "main": convert_markdown_to_html(article.content_html),
-            "faq": convert_markdown_to_html(article.faq_section),
-            "full": ""
-        }
-
-        # Check if FAQ is already embedded in main content to prevent duplication
-        faq_markers = [
-            '<div class="faq-section">',
-            '<h2>Frequently Asked Questions',
-            '<h2>Frequently Asked Question',
-            '<h2>FAQ',
-            '<h3>FAQ',
-            '<strong>Frequently Asked Questions'
-        ]
-        faq_found = any(marker.lower() in content_ctx["main"].lower() for marker in faq_markers)
-
-        if faq_found:
-            logger.info("FAQ section appears to be already embedded in main content, skipping duplicate FAQ append")
-            content_ctx["faq"] = ""  # Don't append FAQ again
-
-        full_content = f"{content_ctx['main']}\n{content_ctx['faq']}" if content_ctx["faq"] else content_ctx["main"]
-        content_ctx["full"] = full_content
-
-        body = re.sub(
-            r"^\s*<h1[^>]*>.*?</h1>\s*",
-            "",
-            content_ctx["full"],
-            flags=re.DOTALL | re.IGNORECASE,
-        )
-        if not body.strip():
-            body = content_ctx["full"]
-
-        # Build tags list from article metadata
-        tags = []
-        if hasattr(article, "category") and article.category:
-            tags.append(article.category)
-        if hasattr(article, "parent_category") and article.parent_category:
-            tags.append(article.parent_category)
-
-        # Add SEO keywords as tags
-        if article.metadata.focus_keyword:
-            tags.append(article.metadata.focus_keyword)
-
-        if article.metadata.keywords:
-            existing_tags = {t.lower() for t in tags}
-            count = 0
-            for keyword in article.metadata.keywords:
-                if keyword.lower() not in existing_tags:
-                    tags.append(keyword)
-                    existing_tags.add(keyword.lower())
-                    count += 1
-                if count >= 10:  # Tumblr handles tags well, let's include more
-                    break
+        body = _prepare_tumblr_body(article)
+        tags = _prepare_tumblr_tags(article)
 
         try:
             logger.info("Publishing article '%s' to Tumblr...", article.title)
@@ -151,25 +83,17 @@ class TumblrPublisher:
                 slug=article.metadata.url_slug
             )
 
-            # Tumblr's Python client may return either a top-level id/id_string
-            # or nest it under a "response" key depending on version.
-            post_id = None
-
-            if isinstance(response, dict):
-                post_id = response.get("id") or response.get("id_string")
-
-                # Older/nested shape: {"response": {"id": ...}}
-                if not post_id and isinstance(response.get("response"), dict):
-                    inner = response["response"]
-                    post_id = inner.get("id") or inner.get("id_string")
-
+            post_id = _parse_post_id(response)
             if not post_id:
                 raise ValueError(f"Unexpected Tumblr response: {response}")
 
-            post_url = f"https://{blog_hostname}/post/{post_id}"
+            if "." not in blog_hostname:
+                post_url = f"https://{blog_hostname}.tumblr.com/post/{post_id}"
+            else:
+                post_url = f"https://{blog_hostname}/post/{post_id}"
 
             result = {
-                "id": str(post_id),
+                "id": post_id,
                 "url": post_url,
                 "title": article.metadata.title or article.title,
                 "blog_hostname": blog_hostname,
@@ -177,14 +101,92 @@ class TumblrPublisher:
 
             logger.info("Successfully published to Tumblr! Post ID: %s - URL: %s", post_id, post_url)
 
-            # Update stats
             try:
                 StatsManager.increment_published("tumblr")
-            except Exception as err:
+            except (RuntimeError, ValueError, KeyError, AttributeError, TypeError, OSError) as err:
                 logger.warning("Failed to update stats for Tumblr publish: %s", err)
 
             return result
 
-        except Exception as err:
+        except (RuntimeError, ValueError, KeyError, AttributeError, TypeError, OSError) as err:
             logger.error("Failed to publish to Tumblr: %s", err)
             raise
+
+
+def _convert_markdown(text: str) -> str:
+    """Convert Markdown to HTML with extensions."""
+    if not text:
+        return ""
+    return markdown.markdown(
+        text,
+        extensions=[
+            'markdown.extensions.extra',
+            'markdown.extensions.tables',
+            'markdown.extensions.sane_lists',
+            'markdown.extensions.toc'
+        ]
+    )
+
+
+def _prepare_tumblr_body(article: ArticleDraft) -> str:
+    """Prepare the HTML body for Tumblr, omitting the title h1 and avoiding duplicate FAQ."""
+    main_html = _convert_markdown(article.content_html)
+    faq_html = _convert_markdown(article.faq_section)
+
+    faq_markers = [
+        '<div class="faq-section">',
+        '<h2>Frequently Asked Questions',
+        '<h2>Frequently Asked Question',
+        '<h2>FAQ',
+        '<h3>FAQ',
+        '<strong>Frequently Asked Questions'
+    ]
+    faq_found = any(marker.lower() in main_html.lower() for marker in faq_markers)
+
+    if faq_found:
+        logger.info("FAQ section appears to be already embedded in main content, skipping duplicate FAQ append")
+        faq_html = ""
+
+    full_content = f"{main_html}\n{faq_html}" if faq_html else main_html
+    body = re.sub(
+        r"^\s*<h1[^>]*>.*?</h1>\s*",
+        "",
+        full_content,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    return body.strip() or full_content
+
+
+def _prepare_tumblr_tags(article: ArticleDraft) -> list[str]:
+    """Build tags list from article metadata."""
+    tags = []
+    if hasattr(article, "category") and article.category:
+        tags.append(article.category)
+    if hasattr(article, "parent_category") and article.parent_category:
+        tags.append(article.parent_category)
+
+    if article.metadata.focus_keyword:
+        tags.append(article.metadata.focus_keyword)
+
+    if article.metadata.keywords:
+        existing_tags = {t.lower() for t in tags}
+        count = 0
+        for keyword in article.metadata.keywords:
+            if keyword.lower() not in existing_tags:
+                tags.append(keyword)
+                existing_tags.add(keyword.lower())
+                count += 1
+            if count >= 10:
+                break
+    return tags
+
+
+def _parse_post_id(response: Any) -> Optional[str]:
+    """Parse post ID from pytumblr response."""
+    if not isinstance(response, dict):
+        return None
+    post_id = response.get("id") or response.get("id_string")
+    if not post_id and isinstance(response.get("response"), dict):
+        inner = response["response"]
+        post_id = inner.get("id") or inner.get("id_string")
+    return str(post_id) if post_id else None

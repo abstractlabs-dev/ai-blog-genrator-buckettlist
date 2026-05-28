@@ -78,7 +78,7 @@ def _make_mock_article(row: dict) -> ArticleDraft:
     slug        = (row.get("wp_published_slug") or row.get("url", "").rstrip("/").split("/")[-1]).strip()
     wp_url      = (row.get("wp_published_url") or row.get("url", "")).strip()
 
-    meta = Metadata(
+    meta = Metadata.model_construct(
         title=title,
         description=description,
         focus_keyword=keywords[0] if keywords else "",
@@ -88,7 +88,7 @@ def _make_mock_article(row: dict) -> ArticleDraft:
         json_ld_schema={},
     )
 
-    article = ArticleDraft(
+    article = ArticleDraft.model_construct(
         title=title,
         content_html=f"<h1>{title}</h1><p>{description}</p>",
         word_count=0,
@@ -147,8 +147,8 @@ def main():
 
     print(f"\n{'='*55}")
     print(f"  Social Export Complete: {success}/{len(rows)} articles exported")
-    print(f"  LinkedIn → {Config.SOCIAL_LINKEDIN_DIR}")
-    print(f"  Medium   → {Config.SOCIAL_MEDIUM_DIR}")
+    print(f"  LinkedIn -> {Config.SOCIAL_LINKEDIN_DIR}")
+    print(f"  Medium   -> {Config.SOCIAL_MEDIUM_DIR}")
     print(f"{'='*55}\n")
 
 

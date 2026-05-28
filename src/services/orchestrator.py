@@ -19,7 +19,9 @@ from src.models import ArticleDraft, SEOReport, NoAvailableProductError, Duplica
 from src.agents import ContentGeneratorAgent, SEOEvaluatorAgent  
 from src.scraper import RobustScraper, SCRAPING_AVAILABLE
 from src.llm_client import call_llm, LLM_AVAILABLE
-from src.publishers import WordPressPublisher, BloggerPublisher, TumblrPublisher
+from src.publishers.wordpress import WordPressPublisher
+from src.publishers.blogger import BloggerPublisher
+from src.publishers.tumblr import TumblrPublisher
 from src.stats_manager import StatsManager
 from utils.utils import CSVManager, VectorStoreManager
 from .internal_linking import InternalLinkingService
@@ -258,9 +260,18 @@ class BlogGeneratorOrchestrator:
 
             # 3. Add mandatory/branded keywords
             if category:
-                keyword_list.insert(0, category.lower())
-                keyword_list.insert(1, f"{category.lower()} in {Config.TARGET_CITY.lower()}")
-                keyword_list.insert(2, f"best {category.lower()} in rishikesh")
+                cat_low = category.lower().strip()
+                city_low = Config.TARGET_CITY.lower().strip()
+                keyword_list.insert(0, cat_low)
+                if city_low in cat_low:
+                    keyword_list.insert(1, cat_low)
+                    if cat_low.startswith("best "):
+                        keyword_list.insert(2, cat_low)
+                    else:
+                        keyword_list.insert(2, f"best {cat_low}")
+                else:
+                    keyword_list.insert(1, f"{cat_low} in {city_low}")
+                    keyword_list.insert(2, f"best {cat_low} in {city_low}")
             
             keyword_list.append(Config.BRAND_NAME.lower())
             keyword_list.append("bucketlistt")
@@ -646,6 +657,14 @@ class BlogGeneratorOrchestrator:
             except Exception as link_err:
                 logger.warning("[Orchestrator] Failed to apply Bucketlistt linking: %s", link_err)
 
+            # Apply SEO Auto-Healing to programmatically guarantee high scores on the first iteration
+            try:
+                from src.services.seo_auto_healer import SEOAutoHealer
+                it_article = SEOAutoHealer.heal(it_article, blog_ctx["target_keywords"], article_type=article_type)
+                logger.info("[Orchestrator] Programmatically auto-healed article '%s' for SEO compliance.", it_article.title)
+            except Exception as heal_err:
+                logger.warning("[Orchestrator] Failed to apply SEO auto-healing: %s", heal_err)
+
             it_report = self.seo_evaluator.evaluate_article(it_article, iteration, article_type=article_type)
 
             self._log_seo_metrics(it_report, it_article, iteration)
@@ -699,16 +718,29 @@ class BlogGeneratorOrchestrator:
                     )
                 if article_type == "brand":
                     feedback += (
-                        "\nFOLLOW THIS CHECKLIST STRICTLY: Use 1 <h1>, at least 3 <h2> and 2 <h3>, "
-                        "10+ <p> paragraphs, at least one <ul>/<ol> with multiple <li>, use <strong> 3+ times, "
-                        f"mention '{Config.TARGET_CITY}' 5+ times and include 2+ phrases like "
-                        f"'best quality in {Config.TARGET_CITY}' or 'best service in {Config.TARGET_CITY}'."
+                        "\nFOLLOW THIS CHECKLIST STRICTLY: Use 1 <h1>, at least 4 <h2>s, at least 2 <h3>s "
+                        "under every <h2>, 10+ <p> paragraphs, at least one <ul>/<ol> with multiple <li>, "
+                        "use <strong>/<b> to bold key phrases at least 10 times. "
+                        f"Mention '{Config.TARGET_CITY}' naturally between 4 and 8 times TOTAL. "
+                        f"MANDATORY: include at least 4 of these exact location phrases: "
+                        f"'in {Config.TARGET_CITY}', 'across {Config.TARGET_CITY}', "
+                        f"'top-rated in {Config.TARGET_CITY}', 'services in {Config.TARGET_CITY}', "
+                        f"'experts in {Config.TARGET_CITY}', 'best quality in {Config.TARGET_CITY}'. "
+                        f"Do NOT use '{Config.BRAND_NAME}' in any <h1> or <h2> heading."
                     )
                 else:
                     feedback += (
-                        "\nFOLLOW THIS CHECKLIST STRICTLY: Use 1 <h1>, at least 3 <h2> and 2 <h3>, "
-                        "10+ <p> paragraphs, at least one <ul>/<ol> with multiple <li>, use <strong> 3+ times, "
-                        "Maintain a COMPLETELY neutral industry focus. DO NOT mention specific cities or brands."
+                        "\nFOLLOW THIS CHECKLIST STRICTLY: Use 1 <h1>, at least 4 <h2>s, at least 2 <h3>s "
+                        "under every <h2>, 10+ <p> paragraphs, at least one <ul>/<ol> with multiple <li>, "
+                        "use <strong>/<b> to bold key phrases at least 10 times. "
+                        f"Write as a knowledgeable independent travel expert about {Config.TARGET_CITY}. "
+                        f"Naturally mention '{Config.TARGET_CITY}' between 4 and 8 times TOTAL in the article. "
+                        f"MANDATORY: include at least 4 of these exact location booster phrases (weave them naturally): "
+                        f"'in {Config.TARGET_CITY}', 'across {Config.TARGET_CITY}', "
+                        f"'top-rated in {Config.TARGET_CITY}', 'services in {Config.TARGET_CITY}', "
+                        f"'experts in {Config.TARGET_CITY}', 'best quality in {Config.TARGET_CITY}'. "
+                        f"Do NOT mention '{Config.BRAND_NAME}' in any <h1> or <h2> heading. "
+                        f"The conclusion may have ONE soft Bucketlistt link — that is acceptable."
                     )
                 prev_report_text = self._generate_seo_report_text(it_report, it_article)
                 reference_text = (

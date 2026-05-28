@@ -33,9 +33,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+import google.genai.errors
 
 from src.config import Config
 from src.models import ArticleDraft, LLMConfig
@@ -139,6 +142,29 @@ def _build_related_linkedin_text(related_articles: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+def _build_related_linkedin_text_link_free(related_articles: List[Dict]) -> str:
+    """Build a short text snippet listing related articles without URLs."""
+    if not related_articles:
+        return ""
+    lines = ["📌 More reads you'll love (links in the comment section!):"]
+    for a in related_articles:
+        lines.append(f"   → {a['title']}")
+    return "\n".join(lines)
+
+
+def _get_random_first_comment(wp_url: str) -> str:
+    """Generate a highly natural, randomized first comment containing the link."""
+    templates = [
+        "🔗 Read the complete detailed travel guide here: {url}",
+        "👉 Get all the insider tips, costs, and safety info in our full guide: {url}",
+        "The full article with step-by-step planning details is live here: {url}",
+        "Check out our complete, updated guide for all details: {url}",
+        "🔗 We compiled everything you need to know in our full guide: {url}",
+        "Read the full story and plan your trip here: {url}"
+    ]
+    return random.choice(templates).format(url=wp_url)
+
+
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
@@ -188,7 +214,7 @@ class SocialExporter:
         filename_base = f"{date_str}_{safe_slug}"
 
         linkedin_path = self._export_linkedin(article, wp_url, related, filename_base)
-        medium_path   = self._export_medium(article, wp_url, wp_slug, related, filename_base)
+        medium_path   = self._export_medium(article, wp_url, related, filename_base)
 
         logger.info(
             "Social exports generated:\n  LinkedIn → %s\n  Medium   → %s",
@@ -203,6 +229,72 @@ class SocialExporter:
     # LinkedIn
     # ------------------------------------------------------------------
 
+    def _truncate_commentary(self, text: str, max_chars: int) -> str:
+        """Truncate commentary to max_chars breaking at last sentence boundary."""
+        if len(text) <= max_chars:
+            return text
+        logger.warning("LinkedIn commentary too long. Truncating...")
+        sliced = text[:max_chars]
+        boundary_matches = list(re.finditer(r'[.!?](\s|\n|$)', sliced))
+        if boundary_matches:
+            last_idx = boundary_matches[-1].end()
+            return sliced[:last_idx].strip() + "\n\n..."
+
+        last_space = sliced.rfind(" ")
+        if last_space != -1:
+            return sliced[:last_space].strip() + "..."
+        return sliced.strip() + "..."
+
+    def _build_fallback_commentaries(
+        self,
+        article: ArticleDraft,
+        wp_url: str,
+        related: List[Dict],
+    ) -> Tuple[str, str]:
+        """Build standard and link-free commentaries using fallback excerpt."""
+        hook_text = _excerpt(_strip_html(article.content_html), max_chars=280)
+        hashtags = _keywords_to_hashtags(
+            list(article.metadata.keywords or []) + [
+                "Rishikesh",
+                "Adventure",
+                "Travel",
+                "India",
+                Config.BRAND_NAME,
+            ]
+        )
+
+        related_text = _build_related_linkedin_text(related)
+        related_text_free = _build_related_linkedin_text_link_free(related)
+
+        selected_cta = random.choice([
+            "📖 Read the full guide here: {url}",
+            "👉 Read the complete breakdown on our blog: {url}",
+            "🏔️ Read the full story and plan your trip: {url}",
+            "Check out the complete updated guide for all details: {url}",
+            "Get all the insider tips in the full article: {url}"
+        ]).format(url=wp_url)
+
+        selected_link_free_cta = random.choice([
+            "👇 Read the full guide in the first comment below!",
+            "👉 Link to the complete, detailed breakdown is in the first comment!",
+            "🏔️ The link to the full story and planning guide is in the comments below!",
+            "Check out the first comment for the link to the full guide!",
+            "👇 Details and full travel guide link are pinned in the first comment!"
+        ])
+
+        parts = [f"🏔️ {article.metadata.title or article.title}", "", hook_text, ""]
+        parts_free = list(parts)
+
+        if related_text:
+            parts.extend([related_text, ""])
+        if related_text_free:
+            parts_free.extend([related_text_free, ""])
+
+        parts.extend([selected_cta, "", hashtags])
+        parts_free.extend([selected_link_free_cta, "", hashtags])
+
+        return "\n".join(parts), "\n".join(parts_free)
+
     def _export_linkedin(
         self,
         article: ArticleDraft,
@@ -212,22 +304,20 @@ class SocialExporter:
     ) -> str:
         """
         Build a LinkedIn post JSON in the Posts API v2 format.
-
-        Strategy: EXCERPT + LINK CARD (SEO-safe — no full content duplication).
-        LinkedIn does not support canonical tags, so posting full content there
-        would create duplicate-content risk for the main website's SEO.
         """
-        title       = article.metadata.title or article.title
-        description = article.metadata.description or ""
-        keywords    = list(article.metadata.keywords or [])
-
+        title = article.metadata.title or article.title
         commentary = ""
+        commentary_link_free = ""
         llm_success = False
+
         try:
             logger.info("Attempting to generate long-form LinkedIn article via LLM...")
-            prompt = create_linkedin_prompt(title, article.content_html or f"<p>{description}</p>", keywords)
             commentary_response = call_llm(
-                prompt,
+                create_linkedin_prompt(
+                    title,
+                    article.content_html or f"<p>{article.metadata.description or ''}</p>",
+                    list(article.metadata.keywords or [])
+                ),
                 config=LLMConfig(
                     model_name=Config.MODEL_NAME,
                     max_tokens=4096,
@@ -244,103 +334,94 @@ class SocialExporter:
             elif commentary_response.startswith("text"):
                 commentary_response = commentary_response[4:].strip()
 
-            related_text = _build_related_linkedin_text(related)
-            max_response_chars = 2800 - (len(related_text) if related_text else 0) - len(wp_url) - 50
-            if len(commentary_response) > max_response_chars:
-                logger.warning("LLM generated LinkedIn commentary too long (%d chars). Truncating response to %d...", len(commentary_response), max_response_chars)
-                sliced = commentary_response[:max_response_chars]
-                # Find last sentence boundary (period, exclamation, question mark followed by space or newline or end)
-                boundary_matches = list(re.finditer(r'[.!?](\s|\n|$)', sliced))
-                if boundary_matches:
-                    last_idx = boundary_matches[-1].end()
-                    commentary_response = sliced[:last_idx].strip() + "\n\n..."
-                else:
-                    last_space = sliced.rfind(" ")
-                    if last_space != -1:
-                        commentary_response = sliced[:last_space].strip() + "..."
-                    else:
-                        commentary_response = sliced.strip() + "..."
+            commentary_response = self._truncate_commentary(
+                commentary_response,
+                2800 - max(
+                    len(_build_related_linkedin_text(related)),
+                    len(_build_related_linkedin_text_link_free(related))
+                ) - 100
+            )
 
+            # 1. Standard Commentary (with Link in Body)
             commentary_parts = [commentary_response]
-            if related_text:
-                commentary_parts.append(related_text)
-            commentary_parts.append(f"📖 Read the full guide: {wp_url}")
-
+            if _build_related_linkedin_text(related):
+                commentary_parts.append(_build_related_linkedin_text(related))
+            commentary_parts.append(random.choice([
+                "📖 Read the full guide here: {url}",
+                "👉 Read the complete breakdown on our blog: {url}",
+                "🏔️ Read the full story and plan your trip: {url}",
+                "Check out the complete updated guide for all details: {url}",
+                "Get all the insider tips in the full article: {url}"
+            ]).format(url=wp_url))
             commentary = "\n\n".join(commentary_parts)
+
+            # 2. Link-Free Commentary (Link in Comments Pointers)
+            commentary_parts_free = [commentary_response]
+            if _build_related_linkedin_text_link_free(related):
+                commentary_parts_free.append(_build_related_linkedin_text_link_free(related))
+            commentary_parts_free.append(random.choice([
+                "👇 Read the full guide in the first comment below!",
+                "👉 Link to the complete, detailed breakdown is in the first comment!",
+                "🏔️ The link to the full story and planning guide is in the comments below!",
+                "Check out the first comment for the link to the full guide!",
+                "👇 Details and full travel guide link are pinned in the first comment!"
+            ]))
+            commentary_link_free = "\n\n".join(commentary_parts_free)
+
             llm_success = True
             logger.info("Successfully generated LLM LinkedIn article (%d chars).", len(commentary))
-        except Exception as exc:
+        except (RuntimeError, ValueError, TypeError, KeyError, AttributeError, OSError,
+                google.genai.errors.APIError) as exc:
             logger.warning("LLM LinkedIn generation failed or offline: %s. Falling back to excerpt.", exc)
 
         if not llm_success:
-            # Build hook — first 2 sentences of the article
-            raw_text   = _strip_html(article.content_html or "")
-            hook_text  = _excerpt(raw_text, max_chars=280)
-
-            # Build hashtags from keywords
-            hashtags = _keywords_to_hashtags(
-                keywords + [
-                    "Rishikesh", "Adventure", "Travel", "India", Config.BRAND_NAME
-                ]
+            commentary, commentary_link_free = self._build_fallback_commentaries(
+                article, wp_url, related
             )
 
-            # Related articles block
-            related_text = _build_related_linkedin_text(related)
-
-            # Full commentary — what the client pastes into LinkedIn
-            commentary_parts = [
-                f"🏔️ {title}",
-                "",
-                hook_text,
-                "",
-            ]
-            if related_text:
-                commentary_parts += [related_text, ""]
-            commentary_parts += [
-                f"📖 Read the full guide: {wp_url}",
-                "",
-                hashtags,
-            ]
-            commentary = "\n".join(commentary_parts)
-
-        payload = {
-            "author": "urn:li:person:YOUR_MEMBER_ID",
-            "commentary": commentary,
-            "visibility": "PUBLIC",
-            "distribution": {
-                "feedDistribution": "MAIN_FEED",
-                "targetEntities": [],
-                "thirdPartyDistributionChannels": []
-            },
-            "lifecycleState": "PUBLISHED",
-            "isReshareDisabledByAuthor": False,
-            "content": {
-                "article": {
-                    "source": wp_url,
-                    "title": title,
-                    "description": description[:200] if description else "",
+        self._write_json(
+            os.path.join(self.linkedin_dir, f"{filename_base}.json"),
+            {
+                "author": "urn:li:person:YOUR_MEMBER_ID",
+                "commentary": commentary,
+                "commentary_link_free": commentary_link_free,
+                "first_comment": _get_random_first_comment(wp_url),
+                "visibility": "PUBLIC",
+                "distribution": {
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "lifecycleState": "PUBLISHED",
+                "isReshareDisabledByAuthor": False,
+                "content": {
+                    "article": {
+                        "source": wp_url,
+                        "title": title,
+                        "description": (article.metadata.description or "")[:200],
+                    }
+                },
+                "related_articles": related,
+                "_meta": {
+                    "platform": "linkedin",
+                    "generated_at": datetime.now().isoformat(),
+                    "wp_url": wp_url,
+                    "wp_slug": filename_base.split("_", 1)[-1],
+                    "instructions": (
+                        "ANTI-BAN LinkedIn MULTI-ACCOUNT PUBLISHING INSTRUCTIONS:\n"
+                        "Option A (Safe - Standard Outbound Link):\n"
+                        "  - Copy the 'commentary' field and paste it directly into LinkedIn.\n"
+                        "Option B (Ultra-Safe - Link-in-Comments Strategy for Multi-Accounts):\n"
+                        "  1. Copy the 'commentary_link_free' field and post it directly to LinkedIn "
+                        "(this post has zero outbound links, completely bypassing domain spam filters).\n"
+                        "  2. Immediately after publishing the post, copy the 'first_comment' field and "
+                        "post it as the very first comment on that post.\n"
+                        "3. Replace 'YOUR_MEMBER_ID' with your LinkedIn member or organization ID if posting via API."
+                    )
                 }
-            },
-            "related_articles": related,
-            "_meta": {
-                "platform": "linkedin",
-                "generated_at": datetime.now().isoformat(),
-                "wp_url": wp_url,
-                "wp_slug": filename_base.split("_", 1)[-1],
-                "instructions": (
-                    "1. Replace 'YOUR_MEMBER_ID' with your LinkedIn person or organization ID.\n"
-                    "2. Copy the 'commentary' field and paste it into LinkedIn's post composer.\n"
-                    "3. The article card (title + description + URL) will auto-preview from the link.\n"
-                    "4. Alternatively POST this JSON to LinkedIn /rest/posts with your Bearer token.\n"
-                    "   Required headers: Content-Type: application/json, "
-                    "X-Restli-Protocol-Version: 2.0.0, LinkedIn-Version: 202504"
-                )
             }
-        }
-
-        path = os.path.join(self.linkedin_dir, f"{filename_base}.json")
-        self._write_json(path, payload)
-        return path
+        )
+        return os.path.join(self.linkedin_dir, f"{filename_base}.json")
 
     # ------------------------------------------------------------------
     # Medium
@@ -350,7 +431,6 @@ class SocialExporter:
         self,
         article: ArticleDraft,
         wp_url: str,
-        wp_slug: str,
         related: List[Dict],
         filename_base: str,
     ) -> str:
@@ -361,67 +441,52 @@ class SocialExporter:
         Medium supports canonical URLs — the system sets this to the live WordPress
         URL, so Google knows the main site is the original. Safe for SEO.
         """
-        title       = article.metadata.title or article.title
-        keywords    = list(article.metadata.keywords or [])
+        wp_slug = article.metadata.url_slug or ""
 
-        # Prepare content: main HTML + related articles block + canonical note
-        main_html = article.content_html or f"<h1>{title}</h1>"
-
-        # Append FAQ if available and not already in content
-        faq_html = article.faq_section or ""
-        if faq_html and faq_html.strip() not in main_html:
-            main_html = main_html + "\n" + faq_html
-
-        # Append related articles block
-        related_html = _build_related_html_block(related)
-
-        # Append canonical attribution note (Medium best practice)
-        attribution = (
-            f"<hr/>"
-            f"<p><em>This article was originally published at "
-            f"<a href='{wp_url}'>{Config.BRAND_NAME}</a>.</em></p>"
-        )
-
-        full_content = main_html + "\n" + related_html + "\n" + attribution
-
-        # Medium tags: max 5, lowercase
-        tags = _keywords_to_medium_tags(keywords)
-
-        payload = {
-            "title": title,
-            "contentFormat": "html",
-            "content": full_content,
-            "tags": tags,
-            "publishStatus": "draft",
-            "canonicalUrl": wp_url,
-            "related_articles": related,
-            "_meta": {
-                "platform": "medium",
-                "generated_at": datetime.now().isoformat(),
-                "wp_url": wp_url,
-                "wp_slug": wp_slug,
-                "instructions": (
-                    "HOW TO PUBLISH ON MEDIUM:\n"
-                    "Option A — Manual (Recommended):\n"
-                    "  1. Go to medium.com > Write a story.\n"
-                    "  2. Copy the 'content' field HTML and paste into the Medium editor.\n"
-                    "  3. Set the title to the 'title' field.\n"
-                    "  4. Click the '...' menu > More Settings > Advanced Settings.\n"
-                    "  5. Check 'This story was originally published elsewhere'.\n"
-                    "  6. Paste the 'canonicalUrl' value and Save canonical link.\n"
-                    "  7. Add tags from the 'tags' array.\n"
-                    "  8. Publish!\n\n"
-                    "Option B — API:\n"
-                    "  POST https://api.medium.com/v1/users/{userId}/posts\n"
-                    "  Header: Authorization: Bearer YOUR_MEDIUM_INTEGRATION_TOKEN\n"
-                    "  Body: this JSON (remove _meta and related_articles fields)."
-                )
+        self._write_json(
+            os.path.join(self.medium_dir, f"{filename_base}.json"),
+            {
+                "title": article.metadata.title or article.title,
+                "contentFormat": "html",
+                "content": (
+                    (article.content_html or f"<h1>{article.metadata.title or article.title}</h1>")
+                    + "\n"
+                    + (article.faq_section or "")
+                    + "\n"
+                    + _build_related_html_block(related)
+                    + "\n"
+                    + "<hr/><p><em>This article was originally published at "
+                    + f"<a href='{wp_url}'>{Config.BRAND_NAME}</a>.</em></p>"
+                ),
+                "tags": _keywords_to_medium_tags(list(article.metadata.keywords or [])),
+                "publishStatus": "draft",
+                "canonicalUrl": wp_url,
+                "related_articles": related,
+                "_meta": {
+                    "platform": "medium",
+                    "generated_at": datetime.now().isoformat(),
+                    "wp_url": wp_url,
+                    "wp_slug": wp_slug,
+                    "instructions": (
+                        "HOW TO PUBLISH ON MEDIUM:\n"
+                        "Option A — Manual (Recommended):\n"
+                        "  1. Go to medium.com > Write a story.\n"
+                        "  2. Copy the 'content' field HTML and paste into the Medium editor.\n"
+                        "  3. Set the title to the 'title' field.\n"
+                        "  4. Click the '...' menu > More Settings > Advanced Settings.\n"
+                        "  5. Check 'This story was originally published elsewhere'.\n"
+                        "  6. Paste the 'canonicalUrl' value and Save canonical link.\n"
+                        "  7. Add tags from the 'tags' array.\n"
+                        "  8. Publish!\n\n"
+                        "Option B — API:\n"
+                        "  POST https://api.medium.com/v1/users/{userId}/posts\n"
+                        "  Header: Authorization: Bearer YOUR_MEDIUM_INTEGRATION_TOKEN\n"
+                        "  Body: this JSON (remove _meta and related_articles fields)."
+                    )
+                }
             }
-        }
-
-        path = os.path.join(self.medium_dir, f"{filename_base}.json")
-        self._write_json(path, payload)
-        return path
+        )
+        return os.path.join(self.medium_dir, f"{filename_base}.json")
 
     # ------------------------------------------------------------------
     # Util
@@ -434,5 +499,5 @@ class SocialExporter:
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, ensure_ascii=False, indent=2)
             logger.debug("Written: %s", path)
-        except Exception as exc:
+        except (OSError, TypeError, ValueError) as exc:
             logger.error("Failed to write social export to %s: %s", path, exc)

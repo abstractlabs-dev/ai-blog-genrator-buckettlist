@@ -466,7 +466,8 @@ class ContentGeneratorAgent:
         return re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:max_length]
 
     def generate_titles(
-        self, num: int = 10, article_type: str = "generic", category: str = "", seed_title: str = ""
+        self, num: int = 10, article_type: str = "generic", category: str = "", seed_title: str = "",
+        scraped_keywords: List[str] = None
     ) -> List[str]:
         """
         Generates SEO-optimized titles for articles.
@@ -477,6 +478,7 @@ class ContentGeneratorAgent:
             article_type: Type of article ('generic' or 'brand')
             category: specific category to generate titles for
             seed_title: An optional existing title to rephrase and improve
+            scraped_keywords: An optional list of custom keywords to use
 
         Returns:
             List of generated article titles
@@ -497,30 +499,31 @@ class ContentGeneratorAgent:
                 used_products.add(product.get(Config.PRODUCT_ID_COL))
 
         product_context = self._format_product_context(product)
-        scraped_keywords: List[str] = []
-        try:
-            if os.path.exists(Config.SCRAPED_ARTICLES_JSON):
-                with open(Config.SCRAPED_ARTICLES_JSON, 'r', encoding='utf-8') as f_handle:
-                    data = json.load(f_handle)
+        if scraped_keywords is None:
+            scraped_keywords = []
+            try:
+                if os.path.exists(Config.SCRAPED_ARTICLES_JSON):
+                    with open(Config.SCRAPED_ARTICLES_JSON, 'r', encoding='utf-8') as f_handle:
+                        data = json.load(f_handle)
 
-                keywords_accumulator: List[str] = []
-                seen = set()
-                for obj in data:
-                    kws = obj.get("keywords") or []
-                    if not kws:
-                        continue
-                    parts = kws if isinstance(kws, list) else [p.strip() for p in str(kws).split(",")]
-                    for part in parts:
-                        if not part:
+                    keywords_accumulator: List[str] = []
+                    seen = set()
+                    for obj in data:
+                        kws = obj.get("keywords") or []
+                        if not kws:
                             continue
-                        lower = part.lower()
-                        if lower in seen:
-                            continue
-                        seen.add(lower)
-                        keywords_accumulator.append(part)
-                scraped_keywords = keywords_accumulator
-        except Exception as err:
-            logger.warning("Failed to load scraped article keywords from JSON: %s", err)
+                        parts = kws if isinstance(kws, list) else [p.strip() for p in str(kws).split(",")]
+                        for part in parts:
+                            if not part:
+                                continue
+                            lower = part.lower()
+                            if lower in seen:
+                                continue
+                            seen.add(lower)
+                            keywords_accumulator.append(part)
+                    scraped_keywords = keywords_accumulator
+            except Exception as err:
+                logger.warning("Failed to load scraped article keywords from JSON: %s", err)
 
         if not LLM_AVAILABLE or (not Config.GOOGLE_AI_STUDIO_API_KEY and not Config.USE_VERTEX_AI):
             return self._generate_fallback_titles(num)
@@ -565,7 +568,12 @@ class ContentGeneratorAgent:
                 # Use sampled keywords for variety
                 title_keywords = sampled_keywords if (sampled_keywords and article_type == "generic") else None
                 prompt = create_title_prompt(
-                    batch_size, product_context, article_type, title_keywords, category, seed_title=seed_title
+                    batch_size,
+                    product_context,
+                    article_type=article_type,
+                    scraped_keywords=title_keywords,
+                    category=category,
+                    seed_title=seed_title
                 )
 
                 content = call_llm(
@@ -913,10 +921,41 @@ class ContentGeneratorAgent:
             )
             meta_description = meta_description.strip().strip('*').strip('_').strip('"').strip("'").strip()
 
+            # ── Yoast-safe meta description: enforce 120–155 character range ────
+            # Yoast turns red below 120 chars and orange/red above 155 chars.
+            # Under-length: pad with a contextual brand tagline to reach minimum.
+            # Over-length: trim at the last word boundary before 155 to avoid
+            # mid-word cuts (e.g. "activi..." instead of "activities").
+            yoast_min, yoast_max = 120, 155
+            if len(meta_description) < yoast_min:
+                padding = (
+                    f" Explore verified {Config.INDUSTRY_NAME} experiences in "
+                    f"{Config.TARGET_CITY} with {Config.BRAND_NAME} — safe, affordable, and easy to book."
+                )
+                meta_description = (meta_description + padding)[:yoast_max]
+            if len(meta_description) > yoast_max:
+                trimmed = meta_description[:yoast_max]
+                last_space = trimmed.rfind(" ")
+                meta_description = trimmed[:last_space] if last_space > yoast_min else trimmed
+            # ────────────────────────────────────────────────────────────────────
+
             focus_keyword = self._extract_section(content, "FOCUS_KEYWORD:", "\n") or (
                 target_keywords[0] if target_keywords else ""
             )
             focus_keyword = focus_keyword.strip().strip('*').strip('_').strip('"').strip("'").strip()
+
+            # ── Guarantee focus_keyword is never empty (Yoast red: "not set") ──
+            # Derive a fallback from the first 3 meaningful words of the title
+            # so Yoast always has a keyphrase to analyse against.
+            if not focus_keyword:
+                title_words = [w for w in title.lower().split() if len(w) > 3][:3]
+                focus_keyword = " ".join(title_words) if title_words else Config.INDUSTRY_NAME
+                logger.warning(
+                    "[SEO] Focus keyword missing from LLM output for '%s'. "
+                    "Using title-derived fallback: '%s'",
+                    title[:50], focus_keyword
+                )
+            # ────────────────────────────────────────────────────────────────────
 
             # ── SLUG GENERATION — Collision-Proof via SlugRegistry ─────────────────
             # Priority: LLM-suggested slug (if clean) → registry-generated slug
@@ -975,7 +1014,7 @@ class ContentGeneratorAgent:
 
             metadata = Metadata(
                 title=meta_title[:60],
-                description=meta_description[:156],
+                description=meta_description[:yoast_max],
                 focus_keyword=focus_keyword,
                 url_slug=url_slug,
                 canonical_url=f"{Config.DEFAULT_LINK_URL}/{url_slug}",
@@ -1323,6 +1362,16 @@ class SEOEvaluatorAgent:
             iteration_number=iteration_number
         )
 
+    @staticmethod
+    def _normalize_for_kw_match(text: str) -> str:
+        import string
+        import re
+        text = text.lower().replace("&", "and").replace("-", " ")
+        text = text.translate(str.maketrans('', '', string.punctuation))
+        # Remove common stop words that LLMs naturally inject between keyword parts
+        text = re.sub(r'\b(in|and|the|for|at|of|to|on|with|a|an)\b', ' ', text)
+        return " ".join(text.split())
+
     def _evaluate_title_meta(self, article: ArticleDraft) -> SEOMetric:
         score = 0
         details = []
@@ -1342,17 +1391,17 @@ class SEOEvaluatorAgent:
             details.append(f"Meta description ({desc_len}) should be 110-165 chars.")
 
         # Keyword in title check - CHECK ALL KEYWORDS (not just first 5)
-        title_lower = article.metadata.title.lower()
-        all_kws = [keyword.lower() for keyword in article.metadata.keywords if isinstance(keyword, str)]
+        title_norm = self._normalize_for_kw_match(article.metadata.title)
+        all_kws = [self._normalize_for_kw_match(keyword) for keyword in article.metadata.keywords if isinstance(keyword, str)]
 
         has_kw = False
         for keyword in all_kws:
-            if keyword in title_lower:
+            if keyword in title_norm:
                 has_kw = True
                 break
             # Check for partial matches (important for long phrases)
             words = keyword.split()
-            if len(words) > 1 and all(w in title_lower for w in words):
+            if len(words) > 1 and all(w in title_norm for w in words):
                 has_kw = True
                 break
 
@@ -1361,19 +1410,32 @@ class SEOEvaluatorAgent:
         else:
             details.append("Include a keyword in the title.")
 
+        # Clamp score to max_score (sub-scores can sum to 20, but declared max is 15)
+        score = min(score, 15)
         feedback = "Title/Meta OK." if score >= 12 else " | ".join(details)
         return SEOMetric(name="Title/Meta Optimization", score=score, weight=15, max_score=15, feedback=feedback)
 
     def _evaluate_keyword_integration(self, article: ArticleDraft) -> SEOMetric:
         score = 0
-        content_lower = article.content_html.lower()
+
+        content_normalized = self._normalize_for_kw_match(article.content_html)
         unique_keywords = [kw for kw in article.metadata.keywords if isinstance(kw, str)]
-        found_kws = sum(1 for kw in unique_keywords if kw.lower() in content_lower)
+        
+        found_kws = 0
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"DEBUG KW - Unique keywords: {unique_keywords}")
+        for kw in unique_keywords:
+            norm_kw = self._normalize_for_kw_match(kw)
+            if norm_kw in content_normalized:
+                found_kws += 1
+            else:
+                logger.error(f"DEBUG KW - Not found: '{norm_kw}' (original: '{kw}')")
 
         # Keyword density (up to 12 points)
         density = 0.0
         if article.word_count > 0:
-            total_mentions = sum(content_lower.count(kw.lower()) for kw in unique_keywords)
+            total_mentions = sum(content_normalized.count(self._normalize_for_kw_match(kw)) for kw in unique_keywords)
             density = (total_mentions / article.word_count) * 100
 
             # Broadened range to accommodate overlapping keywords (niche specific)
@@ -1489,16 +1551,18 @@ class SEOEvaluatorAgent:
 
     def _evaluate_readability(self, article: ArticleDraft) -> SEOMetric:
         score = 0
+        # Each criterion is worth 5 points so the metric can reach its declared max_score of 15.
+        # Previously: 4+3+3=10 (bug — could never reach the 15-point max).
         p_count = len(re.findall(r'<p[^>]*>', article.content_html, re.IGNORECASE))
         if p_count >= 10:
-            score += 4
+            score += 5
         if bool(re.search(r'<(ul|ol)[^>]*>', article.content_html, re.IGNORECASE)):
-            score += 3
+            score += 5
         if bool(re.search(r'<(strong|b)[^>]*>', article.content_html, re.IGNORECASE)):
-            score += 3
+            score += 5
         feedback = (
-            "Readability is good." if score > 10
-            else "Improve readability with more paragraphs, lists, and bold text."
+            "Readability is good." if score >= 15
+            else "Improve readability: need 10+ paragraphs, at least one list, and bold/strong emphasis."
         )
         return SEOMetric(name="Readability & Engagement", score=score, weight=15, max_score=15, feedback=feedback)
 

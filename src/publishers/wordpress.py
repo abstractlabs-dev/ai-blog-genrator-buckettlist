@@ -12,14 +12,15 @@ from bs4 import BeautifulSoup
 from ..config import Config
 from ..models import ArticleDraft
 from ..stats_manager import StatsManager
-from ..services.linking_manager import LinkingManager
 
 logger = logging.getLogger(__name__)
 
 class WordPressPublisher:
 
     def __init__(self):
-        self.base_url = Config.WORDPRESS_BASE_URL.strip() if Config.WORDPRESS_BASE_URL else None
+        # Strip both whitespace and a trailing slash — prevents double-slash endpoints
+        # when the env var is set as 'https://example.com/' instead of 'https://example.com'
+        self.base_url = Config.WORDPRESS_BASE_URL.strip().rstrip('/') if Config.WORDPRESS_BASE_URL else None
         self.username = Config.WORDPRESS_USERNAME.strip() if Config.WORDPRESS_USERNAME else None
         self.app_password = Config.WORDPRESS_TOKEN.replace(" ", "") if Config.WORDPRESS_TOKEN else None
 
@@ -319,6 +320,7 @@ class WordPressPublisher:
         # Inject contextual backlinks (Tier 1) and a CTA widget (Tier 2) into
         # the assembled HTML before sending it to the WP REST API.
         try:
+            from ..services.linking_manager import LinkingManager
             article.content_html = content_ctx["full"]
             enriched_html = LinkingManager.inject_bucketlistt_links(article)
             content_ctx["full"] = enriched_html

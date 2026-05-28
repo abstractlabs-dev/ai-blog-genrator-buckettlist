@@ -68,6 +68,19 @@ class Config:
     GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "asia-south1")
     USE_VERTEX_AI = os.getenv("USE_VERTEX_AI", "True").lower() == "true"
 
+    # Rate Limiting Configuration
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "True").lower() == "true"
+
+    # Smart defaults depending on Vertex AI setting
+    _default_flash_rpm = "120" if os.getenv("USE_VERTEX_AI", "True").lower() == "true" else "15"
+    _default_pro_rpm = "20" if os.getenv("USE_VERTEX_AI", "True").lower() == "true" else "2"
+
+    GEMINI_RPM_LIMIT_FLASH = float(os.getenv("GEMINI_RPM_LIMIT_FLASH", _default_flash_rpm))
+    GEMINI_RPM_LIMIT_PRO = float(os.getenv("GEMINI_RPM_LIMIT_PRO", _default_pro_rpm))
+    GEMINI_RPM_LIMIT_DEFAULT = float(os.getenv("GEMINI_RPM_LIMIT_DEFAULT", "15"))
+    IMAGEN_RPM_LIMIT = float(os.getenv("IMAGEN_RPM_LIMIT", "5"))
+    GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "5"))
+
     # WordPress Configuration
     WORDPRESS_BASE_URL = os.getenv("WORDPRESS_BASE_URL")
     WORDPRESS_USERNAME = os.getenv("WORDPRESS_USERNAME")
@@ -89,8 +102,11 @@ class Config:
                     "Please check your .env file."
                 )
             else:
-                logger.info("Vertex AI configuration loaded: Project=%s, Location=%s", 
-                            cls.GOOGLE_CLOUD_PROJECT, cls.GOOGLE_CLOUD_LOCATION)
+                logger.info(
+                    "Vertex AI configuration loaded: Project=%s, Location=%s",
+                    cls.GOOGLE_CLOUD_PROJECT,
+                    cls.GOOGLE_CLOUD_LOCATION
+                )
         elif not cls.GOOGLE_AI_STUDIO_API_KEY and not cls.USE_VERTEX_AI:
             logger.warning(
                 "GOOGLE_AI_STUDIO_API_KEY not found. Running in fallback (offline) mode.\n"
@@ -136,7 +152,7 @@ class Config:
             os.makedirs(cls.SOCIAL_MEDIUM_DIR, exist_ok=True)
             os.makedirs(cls.EMAILS_DIR, exist_ok=True)
             logger.info("Storage directories ensured under: %s", cls.BASE_DIR)
-        except Exception as error:
+        except OSError as error:
             logger.warning("Could not create storage directories at %s: %s", cls.BASE_DIR, error)
 
     # Scraped data paths
@@ -152,7 +168,7 @@ class Config:
             try:
                 with open(path, 'r', encoding='utf-8') as config_file:
                     return json.load(config_file)
-            except Exception as error:
+            except (OSError, json.JSONDecodeError) as error:
                 logger.warning("Failed to load %s: %s. Using defaults.", path, error)
         else:
             logger.warning("Config file not found at %s. Using defaults.", path)
@@ -182,7 +198,7 @@ class Config:
         if val:
             try:
                 return json.loads(val)
-            except Exception as error:
+            except json.JSONDecodeError as error:
                 logger.warning("Failed to parse JSON for %s from env: %s", env_name, error)
         return default_val
 
@@ -190,7 +206,7 @@ class Config:
     # Keywords
     # Load ALL keywords from keywords.json for deep-topic targeting
     KEYWORDS_ALL = _keywords_cfg
-    
+
     PRIMARY_KEYWORDS = (
         os.getenv("PRIMARY_KEYWORDS", "").split(",")
         if os.getenv("PRIMARY_KEYWORDS")
@@ -221,10 +237,13 @@ class Config:
     # Places Data
     PLACES_PATH = os.path.join(CONFIG_DIR, "places.json")
     PLACES_DATA = _load_json_config.__func__(PLACES_PATH, {"top_tourist_places": [], "underrated_hidden_gems": []})
-    
+
     # Detailed Places Information (New Researcher Data)
     PLACES_DETAILS_PATH = os.path.join(CONFIG_DIR, "rishikesh_places_details.json")
-    PLACES_DETAILS_DATA = _load_json_config.__func__(PLACES_DETAILS_PATH, {"locations": [], "rafting_routes": [], "travel_tips_2026": {}})
+    PLACES_DETAILS_DATA = _load_json_config.__func__(
+        PLACES_DETAILS_PATH,
+        {"locations": [], "rafting_routes": [], "travel_tips_2026": {}}
+    )
 
     # Scraper Targets & Blacklist (Override with JSON strings in .env if needed)
     SCRAPER_TARGETS = _get_env_json.__func__("SCRAPER_TARGETS", _competitors_cfg.get("scraper_targets", {}))
