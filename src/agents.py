@@ -260,14 +260,13 @@ class TitleManager:
             if first_word:
                 self.starting_word_counts[first_word] = self.starting_word_counts.get(first_word, 0) + 1
 
-        try:
-            # We don't lock the file IO to keep the lock duration short,
-            # but we assume the CSV append operation is atomic enough or handled via standard file locks.
-            with open(self.csv_path, 'a', newline='', encoding='utf-8') as f_handle:
-                writer = csv.writer(f_handle)
-                writer.writerow([title, datetime.now().isoformat()])
-        except Exception as err:
-            logger.error("Failed to save used title to %s: %s", self.csv_path, err)
+            try:
+                # Open file in append mode to save title
+                with open(self.csv_path, 'a', newline='', encoding='utf-8') as f_handle:
+                    writer = csv.writer(f_handle)
+                    writer.writerow([title, datetime.now().isoformat()])
+            except Exception as err:
+                logger.error("Failed to save used title to %s: %s", self.csv_path, err)
 
     def is_title_used(self, title: str, slug_registry: Optional['SlugRegistry'] = None) -> bool:
         """Check if a title is already used, too similar, or would collide on a WordPress slug."""
@@ -1281,6 +1280,13 @@ class ContentGeneratorAgent:
             f"Plan your {primary_keyword} experience in {Config.TARGET_CITY} with confidence. "
             f"Covers pricing, safety standards, booking tips, and what to expect."
         )
+        if len(meta_description) < 120:
+            meta_description = meta_description.ljust(120, '.')
+        elif len(meta_description) > 155:
+            trimmed = meta_description[:155]
+            last_space = trimmed.rfind(" ")
+            meta_description = trimmed[:last_space] if last_space >= 120 else trimmed[:155]
+
         meta_title = title
         if primary_keyword.lower() not in meta_title.lower():
             meta_title = f"{primary_keyword.title()} Guide — {Config.TARGET_CITY}"
@@ -1302,7 +1308,7 @@ class ContentGeneratorAgent:
         )
         metadata = Metadata(
             title=meta_title[:60],
-            description=meta_description[:156],
+            description=meta_description,
             focus_keyword=primary_keyword,
             url_slug=slug,
             canonical_url=f"{Config.DEFAULT_LINK_URL}/{slug}",

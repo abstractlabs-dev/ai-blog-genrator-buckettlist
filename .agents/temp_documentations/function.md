@@ -31,9 +31,12 @@ This document lists the critical components, modules, and functions of the AI Bl
 
 ## 4. Client & Rate Limiting Components (`src/llm_client.py` & `src/image_client.py`)
 
+- **`RATE_LIMIT_FALLBACK_MODELS`**: A module-level ordered list defining the **strict priority fallback chain** for text generation: `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-2.5-pro` → `gemini-3.0-flash-preview` → `gemini-3.1-flash-lite`. Every LLM call attempts models in this order, bypassing any that are currently in circuit breaker cooldown.
+- **`get_fallback_models`**: Constructs the active model candidate list for a given call. If a custom primary model is set (e.g. via `.env`) but it is not in the priority chain, it is prepended to the list. If no custom fallbacks are specified, the full priority chain is used in order.
+- **`_apply_circuit_breaker`**: Filters out models currently in 60-second cooldown (set after a 429 rate-limit error). Logs a `[CIRCUIT_BREAKER]` message if the first available model differs from the intended preferred model, indicating a real-time bypass.
 - **`TokenBucketLimiter`**: A thread-safe, blocking token bucket rate limiter class that refuels lazily during access. Threads calling `acquire()` block safely if the rate limit is exceeded.
 - **`get_limiter_for_model`**: A registry function that dynamically initializes and caches model-specific token buckets with safe defaults (e.g. 15 RPM for Flash, 2 RPM for Pro models on free-tier API Keys) or custom overrides from configuration.
-- **`call_llm`**: Wraps the Google GenAI `generate_content` SDK method. Enforces proactive client-side rate limiting via model-specific token buckets and wraps requests in a highly resilient retry loop featuring exponential backoff and randomized jitter to smooth transient quota exhaustion errors.
+- **`call_llm`**: Wraps the Google GenAI `generate_content` SDK method. Enforces proactive client-side rate limiting via model-specific token buckets and wraps requests in a highly resilient retry loop featuring exponential backoff and randomized jitter. When all models are rate-limited, raises `RateLimitExhaustedError` to signal callers to skip dependent work (e.g. image generation).
 - **`get_imagen_limiter` & `generate_blog_image`**: Applies client-side token bucket rate limiting and a retry loop with exponential backoff specifically to Imagen banner image generation.
 
 ---
@@ -42,3 +45,9 @@ This document lists the critical components, modules, and functions of the AI Bl
 
 - **`TumblrPublisher`**: Connects to the Tumblr API and handles markdown-to-HTML conversion, tags generation from keywords, and publishing text posts.
 - **`TumblrAccountSelector`**: Dynamically discovers and loads all configured Tumblr accounts from the environment by scanning `os.environ` dynamically (finding all `TUMBLR_BLOG_HOSTNAME{n}` indices), facilitating round-robin multi-account rotation without hardcoded limits.
+
+---
+
+## 6. Database & Database Write Safety (`utils/utils.py`)
+
+- **`CSVManager`**: Manages reading, writing, and updating records in `articles.csv` and `articles_external.csv`. It is now fully thread-safe across concurrent worker threads by wrapping all file read/write/append operations within a class-level re-entrant lock (`threading.RLock()`), preventing write collisions, duplicate assignments, or database corruption during parallel execution.

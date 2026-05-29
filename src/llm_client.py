@@ -30,8 +30,11 @@ class RateLimitExhaustedError(RuntimeError):
 # Preference: same-family lite variant first (higher quota), then Pro variant.
 # Update this list after running: python scratch/test_model_availability.py
 RATE_LIMIT_FALLBACK_MODELS: list = [
-    "gemini-2.5-flash-lite",   # Same 2.5 family — higher burst quota
-    "gemini-2.5-pro",          # Pro variant — higher quality fallback
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3.0-flash-preview",
+    "gemini-3.1-flash-lite",
 ]
 
 # Thread-safe/module-level cooldown tracking for rate-limited models.
@@ -181,17 +184,25 @@ def get_fallback_models(primary_model: str, custom_fallbacks: Optional[List[str]
     Returns:
         List of fallback model names.
     """
-    models: List[str] = [primary_model]
-    if not custom_fallbacks:
-        for model in RATE_LIMIT_FALLBACK_MODELS:
-            clean_m = model.replace("gemini/", "", 1)
-            if clean_m != primary_model:
-                models.append(clean_m)
-    else:
+    p_clean = primary_model.replace("gemini/", "", 1)
+    priority_chain = [m.replace("gemini/", "", 1) for m in RATE_LIMIT_FALLBACK_MODELS]
+
+    if custom_fallbacks:
+        candidates: List[str] = [p_clean]
         for model in custom_fallbacks:
             clean_m = model.replace("gemini/", "", 1)
-            if clean_m not in models:
-                models.append(clean_m)
+            if clean_m not in candidates:
+                candidates.append(clean_m)
+        return candidates
+
+    models: List[str] = []
+    if p_clean not in priority_chain:
+        models.append(p_clean)
+
+    for model in priority_chain:
+        if model not in models:
+            models.append(model)
+
     return models
 
 
@@ -268,10 +279,11 @@ def _apply_circuit_breaker(
     ]
     if not filtered:
         return models_to_try
-    if filtered[0] != primary_model:
+    if filtered[0] != models_to_try[0]:
         logger.info(
-            "[CIRCUIT_BREAKER] Primary model %s is cooling down due to recent 429 rate limits. "
+            "[CIRCUIT_BREAKER] Preferred model %s (primary: %s) is cooling down. "
             "Bypassing directly to fallback: %s. Task: %s",
+            models_to_try[0],
             primary_model,
             filtered[0],
             task_name
@@ -339,7 +351,10 @@ def call_llm(
 
                 return response.text
 
-            except (RuntimeError, ValueError, TypeError, OSError, AttributeError, LookupError) as ex:
+            except (
+                RuntimeError, ValueError, TypeError, OSError,
+                AttributeError, LookupError, genai.errors.APIError
+            ) as ex:
                 last_error = ex
                 is_429 = any(k in str(ex).upper() for k in ("429", "RESOURCE_EXHAUSTED", "TOO MANY REQUESTS"))
 
@@ -407,6 +422,8 @@ def _calculate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> f
     Pricing per 1M tokens.
     """
     pricing = {
+        "gemini-3.0-flash": {"input": 0.30, "output": 1.20},
+        "gemini-3.1-flash-lite": {"input": 0.075, "output": 0.30},
         "gemini-3-flash": {"input": 0.50, "output": 3.00},
         "gemini-3-pro": {"input": 3.00, "output": 15.00},
         "gemini-2.5-flash": {"input": 0.10, "output": 0.40},
@@ -439,4 +456,6 @@ def get_available_models() -> List[str]:
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
         "gemini-2.5-pro",
+        "gemini-3.0-flash-preview",
+        "gemini-3.1-flash-lite",
     ]

@@ -9,6 +9,8 @@ import threading
 import time
 from typing import Optional, Tuple
 
+from google import genai
+
 from src.config import Config
 from src.llm_client import ClientManager, TokenBucketLimiter
 
@@ -113,7 +115,10 @@ def generate_blog_image(prompt: str) -> Tuple[Optional[bytes], float]:
                 logger.warning("Model %s returned success but no images were generated.", model)
                 break
 
-            except (RuntimeError, ValueError, TypeError, OSError, AttributeError, LookupError) as e:
+            except (
+                RuntimeError, ValueError, TypeError, OSError,
+                AttributeError, LookupError, genai.errors.APIError
+            ) as e:
                 is_429: bool = any(k in str(e).upper() for k in ("429", "RESOURCE_EXHAUSTED", "TOO MANY REQUESTS"))
 
                 if is_429 and attempt < max_retries:

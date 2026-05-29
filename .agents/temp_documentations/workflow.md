@@ -39,7 +39,7 @@ graph TD
 
 ### Stage C: Single-Article Generation, Auto-Healing & SEO Guardrails
 - **Pass 0 (Smart Quota Control & Smoother)**: Every outgoing call to the Google GenAI SDK (for titles, content, evaluation, image generation, and social exporting) is intercepted by a thread-safe **TokenBucketLimiter**. If parallel workers exceed rate limits (e.g. 15 RPM for Flash, 2 RPM for Pro models, or 5 RPM for Imagen), the limiter safely blocks (sleeps) the thread, smoothing request bursts.
-- **Pass 1 (Resilient Generation)**: The generator draft is written via a call to `call_llm`. If transient quota exhaustion occurs, the call is retried up to 5 times using an exponential backoff loop with randomized jitter (`2^retry + jitter`) to recover smoothly.
+- **Pass 1 (Resilient Generation with Priority Fallback Chain)**: Every LLM call enters a fully dynamic priority fallback chain. The system tries models in a strict priority sequence: `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-2.5-pro` → `gemini-3.0-flash-preview` → `gemini-3.1-flash-lite`. If the `.env` primary model (`GEMINI_MODEL`) is not in this list, it is prepended as an override. If a model returns a `429 RESOURCE_EXHAUSTED` error, it is added to a 60-second circuit breaker cooldown and the next model in the priority chain is tried immediately on the next call. The circuit breaker is evaluated fresh on every new API call, so cooled-down models are automatically re-admitted after 60 seconds.
 - **Pass 2 (SEO Auto-Healing)**: The generated draft is programmatically modified by the `SEOAutoHealer` to guarantee strict alignment with meta tags, target city keyword counts (3-10), exact location boosters, scannable heading structures (H1/H2/H3), paragraph counts, bold/strong formatting, bullet lists, FAQ counts, and default internal links. This ensures high scores on the very first try without relaxing quality guardrails.
 - **Pass 3 (Feedback Loop)**: The drafts are ran through 8 metrics in the SEO Evaluator (Title Optimization, Keyword Integration, Word Count, Heading Structure, etc.).
 - **Pass 4 (Dynamic Retries & Backoffs)**: If an article scores below `80/100` (which is rare after healing), the orchestrator provides structural feedback and retries with a modified temperature.
@@ -48,5 +48,6 @@ graph TD
 ### Stage D: Linking & Publishing
 - Branded links, anchors, and deep-research references are dynamically interwoven.
 - The finalized markdown is posted to WordPress via REST APIs, Blogger via Blogger API, and Tumblr via `TumblrPublisher` (rotating dynamically across all discovered Tumblr accounts in a round-robin format), and ingested into Weaviate for semantic analysis.
+- **Thread-Safe DB Logs**: All reading, appending, and updates to the local database files (such as `articles.csv`) are synchronized via a re-entrant lock on `CSVManager`, ensuring multi-threaded workers do not overwrite each other's updates.
 - **Deferred Stats Tracking**: For LinkedIn and Medium campaigns, database updates and `stats.json` increments are deferred until successful email dispatch (remote SMTP send or local fallback save) to ensure stats accuracy.
 
